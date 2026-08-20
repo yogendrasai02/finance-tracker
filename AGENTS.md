@@ -227,3 +227,31 @@ Prefer:
 Avoid:
 
 > HashMap leverages a sophisticated hashing mechanism to facilitate efficient bucket-level localization of key-value associations.
+
+---
+
+# 7. Documentation
+
+When generating documentation (specs, design docs, runbooks, etc.):
+
+### Line breaks: semantic, not character-width
+
+Write one sentence (or short logical clause) per line.
+Do not break a sentence across multiple lines, even if it exceeds a nominal character width.
+
+Example (correct):
+```
+A personal finance tracker for expenses and savings, built for the Indian financial context.
+Primary goals: personal use, portfolio project, closed-circle sharing later.
+The design must support multi-tenancy readiness from day 1.
+```
+
+Example (incorrect):
+```
+A personal finance tracker for expenses and savings, built for the Indian financial
+context (INR, UPI, Indian banks and credit cards). Primary goals, in order: personal
+use, portfolio project, closed-circle sharing later.
+```
+
+This style makes git diffs clearer (one logical change = one line changed), is easier to review, and reads naturally in any editor.
+The reader's editor can soft-wrap long lines for display; the file itself should use semantic breaks.
