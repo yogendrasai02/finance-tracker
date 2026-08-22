@@ -191,12 +191,38 @@ For financial decisions involving software or automation, do not let technical c
 
 - Use simple, direct English.
 - Simplify the language, not the technical content.
+- Prefer short sentences and common words.
 - Use technical terminology when it is the correct term.
 - Do not replace correct technical terminology with unnecessarily simplified language.
 - Avoid academic, research-paper, corporate, or unnecessarily formal language.
-- Avoid unnecessarily sophisticated vocabulary.
+- Avoid unnecessarily sophisticated vocabulary, idioms, metaphors, and academic language.
 - Prefer short sentences and paragraphs.
 - Prefer concrete examples over abstract explanations.
+
+### Language Self-Check (mandatory)
+
+Before sending a response, re-read it and rewrite any sentence that breaks the rules above.
+This check is mandatory for every response, including long design explanations — those are where the style tends to slip.
+
+Concretely, rewrite a sentence if it contains:
+
+- A metaphor or figurative phrase, e.g. "center of gravity", "forces acting on the design", "pulls a structure into existence", "seductively uniform", "your codebase to operate".
+- Dramatic or narrative framing, e.g. "here is where it gets interesting", "the hard case is", "worth noticing".
+- An uncommon word where a common word works, e.g. "materializes" → "is stored", "sanctioned" → "allowed", "regime" → "method".
+- A sentence long enough that it needs re-reading. Split it.
+
+The test: another engineer should be able to read each sentence once and know exactly what it says about the system.
+If a sentence is enjoyable to read but slower to understand, it fails.
+
+Real example from this project (a data-model discussion):
+
+Avoid:
+
+> `transactions` is the center of gravity. B is seductively uniform, but mirror rows are synthetic data with a consistency burden.
+
+Prefer:
+
+> `transactions` is the main table; everything else references it. Option B looks consistent, but the extra rows are fake data that must be kept in sync manually.
 
 ### Explanation Depth
 
@@ -227,6 +253,14 @@ Prefer:
 Avoid:
 
 > HashMap leverages a sophisticated hashing mechanism to facilitate efficient bucket-level localization of key-value associations.
+
+### Reasoning vs Communication
+
+Do not confuse detailed reasoning with detailed communication.
+
+You may perform whatever analysis is necessary internally to complete the task correctly, but the response to me should contain only the information I need to understand the result.
+
+Deep reasoning does not require a long explanation.
 
 ---
 
