@@ -1,8 +1,8 @@
 # Security Review Report: SPEC.md + DATA_MODEL.md (Pre-Implementation Gate)
 
 **Review Date**: 2026-08-23
-**Target**: docs/SPEC.md (Draft v0.3), docs/DATA_MODEL.md (Draft v0.2), docs/STATEMENT_DATA_EXPLORATION.md
-**Status**: Approved with Mitigations
+**Target**: docs/SPEC.md (reviewed at Draft v0.3), docs/DATA_MODEL.md (reviewed at Draft v0.2), docs/STATEMENT_DATA_EXPLORATION.md
+**Status**: Approved with Mitigations — all 8 proposed decisions approved by the owner on 2026-08-23 and applied to SPEC v0.4 and DATA_MODEL v0.3
 
 This is a design review, run before any application code exists.
 No exploits were run and no code was inspected, because there is none.
@@ -121,10 +121,15 @@ No Critical/Blocker findings: the design contains no concrete vulnerability (no 
 | Data Retention & Erasure | Partial | Permanent raw retention is a deliberate audit feature; erasure story deferred with a hard gate before user #2 → H5, SECURITY.md §9 |
 | Audit-Trail Integrity | Pass | DM-02 + D-20 + D-21 are genuine tamper-resistance controls; limits now stated (SR-70, SR-71) and made real by the role split (DM-28) |
 
-## Proposed decisions (need owner approval before doc edits)
+## Proposed decisions — all approved and applied (2026-08-23)
 
-Per the review boundary, SPEC.md and DATA_MODEL.md were not edited.
-The following decisions are proposed; on approval, each gets its row in the corresponding decision log and any referenced section is updated.
+The review itself was run under a propose-don't-edit boundary.
+The owner approved all eight on 2026-08-23, and they are now folded into the two decision logs and the sections they touch: SPEC.md is Draft v0.4, DATA_MODEL.md is Draft v0.3.
+
+Applied alongside them, found while folding in:
+
+- **SPEC §8 contradicted SR-07.** It said isolation testing happens in the closed-circle phase, while the review requires structural scoping and the two-user IDOR suite during MVP. §8 now states that invites and roles wait, and isolation does not.
+- **DATA_MODEL §10 said "Three rules" above a four-row table**, left over from the earlier data-model review. Reworded so the count cannot go stale again; the table now has six rows.
 
 **SPEC.md:**
 

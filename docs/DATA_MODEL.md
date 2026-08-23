@@ -1,6 +1,6 @@
 # FinanceTracker — Data Model (MVP)
 
-Status: Draft v0.2
+Status: Draft v0.3
 Last updated: 2026-08-23
 
 ## 1. Purpose and scope
@@ -54,6 +54,46 @@ This is the widest change in the schema — it touches nearly every foreign key.
 Write the base schema in one migration: each parent's `UNIQUE (user_id, id)` must exist before any child's composite key can reference it.
 So a table's `UNIQUE (user_id, id)` and every `FOREIGN KEY (user_id, ...)` pointing at it belong in the same migration, added parent-first.
 Do not add the plain single-column foreign keys first and convert them later; that is a second migration for no reason, and it leaves a window where cross-tenant references are possible.
+
+### 2.3 Tenant isolation at query time (DM-30)
+
+§2.2 stops a row from *referencing* another user's row.
+It does not stop a query that forgets `WHERE user_id = ?` from *returning* one.
+That gap is the common cause of cross-tenant data leaks, and it is not closed by any foreign key.
+
+Row-Level Security closes it in the database.
+Every domain table has RLS enabled with a policy restricting visible rows to the current tenant, and the application sets the tenant once per transaction:
+
+```sql
+SET LOCAL app.user_id = '<authenticated user id>';
+```
+
+The service layer still scopes every query explicitly.
+That is the primary mechanism, and an architecture test fails the build if a repository for a user-owned entity exposes a finder without tenant scope.
+RLS is the backstop, for the same reason the immutability triggers exist (DM-02) and the dedup constraint sits in the database (D-20): the check survives an application bug.
+
+The cost is real and worth stating.
+`SET LOCAL` has to run on every transaction that touches a domain table, so the connection pool and the transaction boundary must cooperate.
+A connection handed out without the setting returns zero rows rather than another user's rows, so the failure is loud rather than silent — but it is still a failure, and it needs its own test.
+
+Enabled now, while the tables are empty and there is one user.
+Retrofitting RLS onto a populated schema is the same argument §2.2 already makes for composite keys.
+See [SECURITY.md](SECURITY.md) SR-01 … SR-03.
+
+### 2.4 Database roles (DM-28)
+
+Two roles, because DM-02's triggers and §2.3's policies bind only a session that cannot switch them off.
+
+| Role | Rights | Used by |
+| ---- | ------ | ------- |
+| Application role | `SELECT`, `INSERT`, `UPDATE`, `DELETE` on the app schema. No DDL, no `ALTER TABLE`, no trigger control, no `BYPASSRLS` | The running application |
+| Migration role | Owns the schema, full DDL | Flyway, at deploy time |
+
+DM-02 argues that a database trigger "survives application bugs, bulk updates, and a manual `psql` session".
+That is only true of a session which cannot run `ALTER TABLE ... DISABLE TRIGGER`.
+If the application connects as the schema owner, the argument is void and the trigger is merely a strong suggestion.
+The role split is what makes the claim hold.
+See [SECURITY.md](SECURITY.md) SR-48.
 
 ## 3. Entity relationship diagram
 
@@ -229,6 +269,11 @@ The cost is real and worth stating.
 Trigger logic is invisible from the Java code, and a developer who has not read this document will be surprised by the exception.
 Mitigation is that the exception messages name the rule directly, and that both triggers are covered by tests.
 
+Two limits, so the guarantee is not over-trusted.
+The triggers bind only a session without DDL rights, which is why the application connects as a restricted role (§2.4) — without that, any code path could disable them.
+And they are not cryptographic: they make tampering through the application hard, they do not prove to an outside auditor that nothing was tampered with.
+The exception messages name the rule for the developer's benefit; at the API boundary the response is a generic error and the rule name goes to the log only (SECURITY.md SR-70, SR-76).
+
 ### 5.5 Category correctness is a foreign key, not a check (DM-06)
 
 `categories` carries `UNIQUE (user_id, id, kind)`, and `transactions` declares:
@@ -311,6 +356,16 @@ This is the audit trail required by §4 and FR-2, and it is kept permanently.
 SBI's mid-word line break is stored exactly as the bank wrote it, even though the transaction stores the unwrapped narration.
 HDFC's numeric cells are stored with full precision as read.
 If the normalizer is ever found to be wrong, the original data is still here to re-derive from.
+
+**Transaction-table rows only (DM-27).**
+"Verbatim" applies to the rows of the transaction table, not to the whole sheet.
+The statement's header and footer blocks carry the account holder's name, account number, CIF/customer ID, IFSC and MICR codes, branch contact details and credit limits — see the Privacy note in [STATEMENT_DATA_EXPLORATION.md](STATEMENT_DATA_EXPLORATION.md).
+The application has no use for any of it.
+Those blocks are read transiently during parsing, to validate the statement period, the opening balance and the credit card's Account Summary, and are never written to `raw_cells` or to any other column.
+An import test asserts that the fixture's account number and customer ID appear nowhere in the database.
+
+This is the cheapest control in the security review: data that is never stored cannot leak through a backup, a log, or a query bug.
+See [SECURITY.md](SECURITY.md) SR-20.
 
 **`row_status` makes FR-2's counts a query.**
 The post-import summary of new, duplicate and needs-attention counts is a `GROUP BY row_status` over this table.
@@ -534,7 +589,20 @@ One shared pattern list cannot serve both, so rules can be scoped to one account
 
 Substring matching is deliberate.
 Regular expressions would be more powerful and much easier to get subtly wrong in a user-editable field.
-If substring matching proves insufficient during the first real categorization pass, a `match_type` column can be added then.
+If substring matching proves insufficient during the first real categorization pass, a `match_type` column can be added then — with its own review, because regex evaluation over user input needs a timeout and an engine that cannot backtrack catastrophically.
+
+**`narration_pattern` is user input matched against every imported row (DM-29).**
+Two constraints follow:
+
+- `CHECK (char_length(narration_pattern) BETWEEN 2 AND 100)`.
+  An empty or single-character pattern silently categorizes almost everything, which is a correctness trap before it is anything else.
+- Matching treats the pattern as a **literal**.
+  If it is pushed to SQL as `ILIKE '%' || pattern || '%'`, then `%`, `_` and `\` inside the pattern are escaped first; otherwise a user pattern becomes a wildcard expression.
+  Matching in Java with a case-folded `contains` needs no escaping.
+  Either way, a test proves that a pattern containing `%` matches only a literal `%`.
+
+The number of active rules per user is capped in the service layer (§10), because matching cost is rules × rows on every import.
+See [SECURITY.md](SECURITY.md) SR-65 … SR-67.
 
 When the owner edits a rule, it re-runs only over rows whose `category_source = 'RULE'` and `category_rule_id` is this rule (§5.1, DM-21).
 A category the owner set by hand (`category_source = 'MANUAL'`) is never overwritten by a rule change.
@@ -584,7 +652,7 @@ Recorded here so the omission is understood as a decision rather than an oversig
 
 ## 10. Rules enforced in the application
 
-Three rules need to see two tables at once, which plain constraints cannot do.
+These rules cannot be expressed as plain constraints, mostly because they need to see two tables at once.
 They live in the service layer.
 Each one gets a test — that is the price of not having the database enforce them.
 
@@ -594,6 +662,8 @@ Each one gets a test — that is the price of not having the database enforce th
 | A `TRANSFER` row is in a transfer link, and every transfer link member is a `TRANSFER` row | Requires counting rows in `transaction_link_members` |
 | A transfer link has exactly 1 member (one-sided) or 2 members (matched pair) | Cardinality across two tables |
 | Deleting a transaction resolves its link first: move it on a merge, dissolve it on a replace (§7.5) | The correct action depends on why the row is being deleted, which no constraint can see |
+| A user has at most 500 active `category_rules` (DM-29) | A per-user row count. A trigger could do it, but this is a policy limit protecting import CPU, not a data-integrity rule, so it belongs where the policy is |
+| Every transaction sets `app.user_id` before touching a domain table (§2.3) | The value comes from the authenticated session, which the database cannot see |
 
 The first could be enforced with a trigger.
 It is not, because it would fire on every imported row during a 361-row import, and the import path already validates it once per batch as part of the D-21 chain check.
@@ -646,3 +716,7 @@ Where it needed a table or a column, nothing is built.
 | DM-24 | `ON DELETE` is explicit: `RESTRICT` on ledger and reference links, `CASCADE` only for a join child with its parent (link members with their link; dismissed matches with their transactions) | A delete rule on a ledger is a decision, not a Postgres default. A financial row must never disappear by an unplanned cascade |
 | DM-25 | Every table has `created_at`; a table whose rows change also has `updated_at` | Basic audit of when a row was made and last changed, set by the app or a trigger |
 | DM-26 | `dismissed_matches` carries `UNIQUE (user_id, match_type, transaction_id_a, transaction_id_b)` | The `a < b` check stops the mirror copy but not an exact duplicate. The unique constraint also serves the lookup that excludes dismissed pairs from suggestions |
+| DM-27 | `raw_cells` stores transaction-table rows only. Statement header and footer blocks — name, account number, CIF/customer ID, IFSC/MICR, branch details, credit limits — are parsed transiently for validation and never persisted (§6.2) | The application has no use for those identifiers, and data that is never stored cannot leak through a backup, a log, or a query bug. Cheapest control in the security review. An import test asserts the account number appears nowhere in the database (SECURITY.md SR-20) |
+| DM-28 | Two database roles: the application connects with DML-only rights (no DDL, no trigger control, no `BYPASSRLS`), Flyway migrations run under a separate schema-owning role (§2.4) | DM-02 claims its triggers survive a manual `psql` session. That is only true of a session that cannot `ALTER TABLE ... DISABLE TRIGGER`. Without the role split the trigger guarantee and the RLS policies are both optional (SECURITY.md SR-48) |
+| DM-29 | `narration_pattern` gains `CHECK (char_length BETWEEN 2 AND 100)`; matching treats the pattern as a literal, escaping `%`, `_` and `\` if implemented with `LIKE`/`ILIKE`; active rules per user are capped at 500 in the service layer (§8.2, §10) | The pattern is user input matched against every imported row. Unescaped, it becomes a wildcard expression; unbounded in length, a one-character pattern categorizes everything; unbounded in count, matching cost is rules × rows on every import (SECURITY.md SR-65 … SR-67) |
+| DM-30 | Row-Level Security is enabled on every domain table, with the application setting `app.user_id` per transaction via `SET LOCAL`. Service-layer scoping remains the primary mechanism; RLS is the backstop (§2.3) | DM-23's composite keys stop a row from *referencing* another user's row but not a query from *returning* one. Same reasoning as DM-02 and D-20: the database check survives an application bug. Cheapest while tables are empty. Cost: `SET LOCAL` must cooperate with the connection pool and transaction boundary, which needs its own test (SECURITY.md SR-01 … SR-03) |

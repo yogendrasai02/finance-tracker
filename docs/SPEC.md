@@ -1,6 +1,6 @@
 # FinanceTracker — Product Specification (Phase 0)
 
-Status: Draft v0.3
+Status: Draft v0.4
 Last updated: 2026-08-23
 
 ## 1. Purpose
@@ -192,6 +192,10 @@ Merchant analytics are **not** user-facing in MVP; merchant/narration patterns e
 - **Manual-entry collision**: on import, the app suggests merges between manual entries and imported rows (same account, same amount, ±3 days); owner confirms.
   Confirmed merge keeps imported facts + manual interpretation (category, notes).
 - Initial backfill: the **current financial year's** statements — the FY-to-date exports already supply the whole year in one file per bank account — reviewed and actioned by the owner. More history later if desired.
+- **An uploaded statement is untrusted input on an internet-facing endpoint.**
+  Size, sheet, row and column caps, zip and XML hardening, content-based `.xlsx`-only acceptance and a parse timeout are product requirements, not parser implementation details — they are specified in [SECURITY.md](SECURITY.md) §4 and the parser design must implement them (D-28).
+  The uploaded file itself is **not retained** after its rows are stored: `statement_import_rows.raw_cells` is the audit copy and `file_sha256` the identity (D-29).
+  Only the transaction table is stored. The statement's header block — account holder name, account number, CIF/customer ID, IFSC/MICR, credit limits — is read for validation and never persisted (DM-27).
 
 ### 4.1 Deduplication and import integrity
 
@@ -279,8 +283,21 @@ Splits (one transaction, many categories — data model may anticipate it, UI la
 ## 8. Security & architecture posture (day 1)
 
 - Cloud-hosted DB; the app is internet-facing even in single-user phase, therefore: real authentication from day 1 (no "localhost trust"), TLS everywhere, secrets in a secret store (never in the repo), encryption at rest for the DB, no financial data or PII in logs.
+- **[SECURITY.md](SECURITY.md) is the normative security document (D-30).**
+  It classifies what this app stores and turns each line above into numbered, testable requirements (`SR-nn`): tenant isolation, statement-upload and parser safety, logging and redaction, auth and session constraints, secrets, encryption, retention and deletion, error handling.
+  Its §14 lists what a production deployment must have in place.
+  Where this section and SECURITY.md appear to disagree, SECURITY.md governs.
+- **The data is unusually sensitive.**
+  Statements carry the owner's financial PII and, inside narrations, **third parties' names, phone numbers and UPI VPAs**.
+  Both are first-class assets. This is why narrations never reach logs and why sending them to an external LLM (§6) is an explicit decision rather than a default.
 - **Multi-tenancy readiness, not multi-tenancy**: every domain table carries `user_id` from day 1; MVP has exactly one user.
-  Auth hardening, invites, and isolation testing happen in the closed-circle phase.
+  Invites and roles wait for the closed-circle phase.
+  **Isolation does not wait.**
+  Tenant scoping is structural from the first query, Row-Level Security is on from the first migration (DM-30), and the two-user IDOR test suite is written during MVP.
+  Every query written now is inherited by the closed-circle phase, so deferring this would mean re-auditing all of them later.
+- **A full-tenant erasure path must exist before a second person's data is held (D-32).**
+  The permanent retention of third-party PII in raw rows is re-examined at the same point.
+  Neither is MVP work; both are gates on the closed-circle phase rather than open-ended deferrals.
 - Stack (decided in earlier discussion): React + TypeScript frontend, Spring Boot backend, PostgreSQL, monorepo.
   Migrations via Flyway. Financial logic covered by tests before UI polish.
 
@@ -315,6 +332,11 @@ Splits (one transaction, many categories — data model may anticipate it, UI la
 | D-25 | Add a **Bank Charges & Fees** expense category; forex markup and GST rows go there | These INR rows appear on the first import and had no home; Misc would hide them |
 | D-26 | A near-miss (§4.1) is resolved by the owner as keep-as-new or treat-as-duplicate | Guessing either way loses a transaction or corrupts the audit trail |
 | D-27 | Replacing a statement batch returns any matched transfer on the replaced rows to the review inbox for re-confirmation | The replaced card row is gone, so the old link is stale; the owner re-matches against the new batch rather than trusting a broken link |
+| D-28 | Statement upload and parsing enforce the [SECURITY.md](SECURITY.md) §4 limits: 5 MB cap, zip and XML hardening (inflate ratio, entry count, DTD/XXE off), exactly 1 sheet, 10,000 rows, 50 columns, 30 s timeout off the request thread, content-based `.xlsx`-only acceptance rejecting macros. The parser design note implements these, adjusting numbers only with recorded rationale | The import endpoint is untrusted, internet-facing input into a zip-of-XML parser. Each missing limit is a concrete crash or exfiltration vector. The single-sheet cap also makes the security limit and the parser's contract one rule, so a two-sheet export fails loudly instead of silently reading the wrong sheet |
+| D-29 | The uploaded file is not retained after its rows are stored; `raw_cells` is the audit copy and `file_sha256` the identity. The multipart threshold is set above the size cap so an accepted file never reaches disk, with a private `0700` spill directory as backstop | Avoids a second, unmanaged copy of the most sensitive data. Spring writes uploads to a temp file by default (`file-size-threshold` is `0B`), so this needs a configuration decision, not merely a decision to write no saving code. FR-2's traceability is already met by `statement_import_rows` |
+| D-30 | [SECURITY.md](SECURITY.md) is normative; §8 references it. Its data classification and logging rules replace the one-line logging statement, and the log-capture test is part of definition-of-done. Postgres `DETAIL` logging is permitted in local development and refused from the first deployment onwards, with redaction as the default and a startup assertion under the production profile | One line is an intention; classification plus whitelist logging plus a test is a control. The development exception has real value while building the importer, and it holds only because forgetting to configure anything gives the safe result. Consequence: development logs contain real third-party PII and are themselves restricted |
+| D-31 | The FR-8 auth mechanism, when chosen, must satisfy SECURITY.md §6 (SR-35 … SR-41) | Keeps the mechanism genuinely open while closing the defaults that are expensive to undo — a token in browser storage, an unauthenticated dev profile, or a seeded password inside a Flyway migration |
+| D-32 | A full-tenant erasure path — every row for a `user_id`, including raw rows and replaced imports, with a documented trigger exception for whole-tenant purge — must be designed and built before any second user exists. Raw-row retention for third-party PII is re-examined at the same gate | Erasure duties attach the moment another person's data is held. Retrofitting deletion into a `RESTRICT`-everywhere, trigger-guarded schema is exactly the work that gets skipped under time pressure, so it is a gate rather than a backlog item |
 
 ## 10. MVP functional requirements
 
@@ -326,6 +348,7 @@ Each shows a derived balance (§2.2, §5).
 **FR-2 — Statement import.** Upload each bank's native statement export for the three in-scope accounts (SBI savings, HDFC savings, HDFC Millenia CC), per §4.
 Import is idempotent across overlapping re-imports; every import creates a batch preserving raw rows; each transaction is traceable to its source row.
 A post-import summary shows counts: new / duplicate / needs-attention.
+Uploads are authenticated, rate-limited, and subject to the [SECURITY.md](SECURITY.md) §4 limits; the file itself is not retained after its rows are stored (D-28, D-29).
 
 **FR-3 — Manual quick entry.** Add a transaction (account, amount, date, category, needs/wants, note) in under 10 seconds.
 Manual entries are editable; on later import, the app suggests merges with matching imported rows (same account + amount, ±3 days), confirm-first.
@@ -348,3 +371,5 @@ Month navigation; no custom date ranges in MVP.
 
 **FR-8 — Authentication.** Real login from day 1 (app is internet-facing) for a single seeded user.
 No registration, invites, or roles in MVP.
+The mechanism is still unchosen, and choosing it is its own design step.
+Whatever is chosen must satisfy the constraints in [SECURITY.md](SECURITY.md) §6 (D-31): TLS on both hops, the session in an `HttpOnly`/`Secure`/`SameSite` cookie rather than browser storage, server-side expiry and logout, rate-limited login with uniform failure messages, the seeded credential bootstrapped from the environment rather than written into a migration, CSRF protection and strict CORS.
