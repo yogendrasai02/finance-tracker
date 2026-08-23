@@ -1,7 +1,7 @@
 # FinanceTracker — Product Specification (Phase 0)
 
-Status: Draft v0.2
-Last updated: 2026-08-21
+Status: Draft v0.3
+Last updated: 2026-08-23
 
 ## 1. Purpose
 
@@ -54,11 +54,18 @@ Explicitly **not** accounts:
 - **Financial facts are immutable** for imported transactions: date, amount, narration, account, source reference.
   What is editable is the _interpretation layer_: category, needs/wants tag, notes, links.
 - Manual entries are fully editable until matched/merged with an imported row; after merge, the imported facts win.
-- Every transaction has one of three natures:
+- Every classified transaction has exactly one nature:
   - **Expense** — money left the owner's world.
   - **Income** — money entered the owner's world.
   - **Transfer** — money moved between the owner's own accounts.
     Transfers are **neither income nor expense** and must never appear in spend/income reports.
+- **Nature is assigned, not assumed.**
+  On import the categorization rules (§6) set the nature together with the category.
+  A row that no rule classifies is left **unclassified**: it counts as neither income nor expense and stays in the review inbox (FR-5) until the owner sets its nature.
+  This keeps a dashboard number from ever being silently wrong — at most it is incomplete.
+- **One-sided transfers are found from the inbox, not the matcher.**
+  The transfer matcher (§2.4) only proposes two-sided pairs.
+  A transfer with one bank side and a virtual counterparty — a SIP into Investments — has no second row to match, so the owner marks it from the review inbox.
 
 ### 2.3 Credit card model
 
@@ -67,7 +74,8 @@ Explicitly **not** accounts:
 - The monthly **bill payment is a transfer** (bank → card). It is never an expense — the expense already happened at swipe time.
   This is what prevents double counting.
 - A card's derived balance at any moment = the upcoming bill (a free feature).
-- Refunds/reversals (e.g., a returned Amazon order) are **negative expenses in the original category** — August "Shopping" shrinks; refunds are not income.
+- Refunds/reversals (e.g., a returned Amazon order) are **negative expenses in the original category**, dated when the credit lands — refunds are not income.
+  The negative reduces that category in the month the refund is credited, which may be later than the purchase month, so a month's category total can go negative.
 - **Cashback and reward redemptions are income**, category "Cashback".
 - EMIs and pay-later products: **out of scope** (owner does not use them).
   If one ever appears, each statement installment is simply an expense as it appears.
@@ -159,7 +167,11 @@ No extra MVP work is implied by this section.
 - Independent **Needs/Wants tag** on expense transactions (owner thinks in these terms).
 
 Initial expense categories (owner's draft, to be refined during first imports):
-Groceries & Vegetables · Eating Out · Office Food · Transport · Car & Maintenance · Travel & Vacation · Home · Utilities · Subscriptions · Clothes & Accessories · Healthy Lifestyle · Family · Seva · Cash Spends · ICICI Card Spends · Misc
+Groceries & Vegetables · Eating Out · Office Food · Transport · Car & Maintenance · Travel & Vacation · Home · Utilities · Subscriptions · Clothes & Accessories · Healthy Lifestyle · Family · Seva · Bank Charges & Fees · Cash Spends · ICICI Card Spends · Misc
+
+A foreign transaction lands as several INR rows: the purchase, a markup fee, and GST rows (exploration §5.9).
+The markup fee and GST rows are ordinary expenses in **Bank Charges & Fees**; the purchase keeps its normal category.
+MVP does not join these rows back into one event.
 
 Income categories: Salary · Interest · Cashback · Dividends · Freelance · Other Income
 
@@ -169,7 +181,7 @@ Merchant analytics are **not** user-facing in MVP; merchant/narration patterns e
 
 - The single XLSX workbook with three sheets (SBI savings, HDFC savings, HDFC Millenia CC) is the **owner's manual collection convenience** — how the raw statements happen to be assembled today for understanding the data.
   It is **not** the app's ingestion contract.
-  The app imports each bank's **native export directly** — SBI Savings, HDFC Savings and HDFC Millenia CC each as their own file, in the XLSX shape documented in [STATEMENT-DATA-EXPLORATION.md](STATEMENT-DATA-EXPLORATION.md) — not the combined workbook.
+  The app imports each bank's **native export directly** — SBI Savings, HDFC Savings and HDFC Millenia CC each as their own file, in the XLSX shape documented in [STATEMENT_DATA_EXPLORATION.md](STATEMENT_DATA_EXPLORATION.md) — not the combined workbook.
   One file per statement period per account; the CC's file is one statement cycle.
 - **ICICI Amazon Pay CC is out of MVP scope** — its statements are PDF-only, and PDF parsing is a subproject we defer (D-17).
   Since the card is not a tracked account in MVP, its bill payment from HDFC/SBI cannot be a transfer; instead it is an **expense in category "ICICI Card Spends"** — the same blunt model as cash (§2.5): an opaque but honest bucket, visible in reports, until the card enters scope.
@@ -179,13 +191,13 @@ Merchant analytics are **not** user-facing in MVP; merchant/narration patterns e
 - Every import creates an **import batch** that preserves the raw rows verbatim — the audit trail from any transaction back to its source line must never break.
 - **Manual-entry collision**: on import, the app suggests merges between manual entries and imported rows (same account, same amount, ±3 days); owner confirms.
   Confirmed merge keeps imported facts + manual interpretation (category, notes).
-- Initial backfill: **3 months** of history; more later if desired.
+- Initial backfill: the **current financial year's** statements — the FY-to-date exports already supply the whole year in one file per bank account — reviewed and actioned by the owner. More history later if desired.
 
 ### 4.1 Deduplication and import integrity
 
 No source provides a usable reference number: SBI's column is empty in every row and no export populates it, HDFC Savings' column is populated but not unique, and the credit card has no such column.
 Row identity is therefore derived from row content, differently per source type.
-Evidence for everything below is in [§6 of the exploration doc](STATEMENT-DATA-EXPLORATION.md).
+Evidence for everything below is in [§6 of the exploration doc](STATEMENT_DATA_EXPLORATION.md).
 
 **Bank accounts (SBI, HDFC Savings) — content key including the running balance.**
 
@@ -208,6 +220,7 @@ The only possible overlap is re-uploading the same statement file, which is a **
 Identity is `(user_id, account_id, statement_date, ordinal_within_statement)`.
 Re-uploading an already-imported `(account, statement_date)` offers to **replace** the batch, never to merge rows into it.
 Ordinal fragility does not matter because batches are replaced whole.
+Replacing a batch deletes its rows, so any matched transfer that used one of those rows is returned to the review inbox; the owner re-confirms it against the new batch (D-27).
 
 **Storage and enforcement.**
 
@@ -223,6 +236,7 @@ Ordinal fragility does not matter because batches are replaced whole.
 A row matching an existing one on `(account, date, amount, balance)` but differing in normalized narration is neither inserted nor silently updated.
 It goes to the needs-review inbox (FR-5) showing both versions.
 It is either a bank restatement of the narration or a genuinely distinct transaction, and guessing wrong either loses a real transaction or corrupts an audit trail.
+The owner resolves it by choosing **keep as a new transaction** or **treat as a duplicate** of the existing row.
 
 **Batch-level integrity gate (bank accounts).**
 A batch commits only if its balance chain reconciles:
@@ -244,12 +258,17 @@ For credit cards the equivalent gate is the statement's own Account Summary bloc
   1. **Category-wise expenses for a month** (the #1 requested view).
   2. Income vs expense per month.
   3. Savings capacity and Invested (§2.6) per month.
+- **Reports count only classified rows.** An unclassified row (§2.2) is in neither the income nor the expense total. It stays in the review inbox until the owner sets its nature.
+- **Each month shows a completeness state.** A month is complete when every in-scope account has imports covering the whole month and no held (§4.1) or near-miss rows affect it. Until then the dashboard marks the month incomplete.
+- **Card spend for a month is provisional** until the statement covering the month end is imported, which lands about mid-next-month. Manual quick entry (FR-3) fills the gap before then.
 - Balance model: **derived balances with reconciliation checkpoints** — balances are computed from transactions; the owner occasionally enters the real bank balance and the app surfaces any drift as a data-quality warning (missing imports).
 
 ## 6. Categorization automation
 
 - MVP: **local rules engine only** — narration pattern → category (e.g., contains "SWIGGY" → Eating Out).
   Rules are user-editable data, not code.
+- Editing a rule re-applies to the rows that rule set, never to categories the owner set by hand.
+  Each row records whether its category came from a rule or from the owner, so a rule change never overwrites a manual choice.
 - Phase 2: LLM-assisted categorization for narrations that no rule matches — only if the rule system proves insufficient.
   Sending narrations to an external LLM API is a privacy decision to revisit explicitly at that point, not a default.
 
@@ -283,7 +302,7 @@ Splits (one transaction, many categories — data model may anticipate it, UI la
 | D-12 | Flat categories (≤ ~18) + independent Needs/Wants tag                                                  | Owner thinks in these dimensions; hierarchy deferred                  |
 | D-13 | Derived balances + manual reconciliation checkpoints                                                    | Savings picture + data-quality tripwire without perfection burden     |
 | D-14 | Rules-based categorization first; LLM only if rules fall short (privacy revisit)                        | Local-first privacy posture                                           |
-| D-15 | 3-month initial backfill                                                                                | Bounded categorization effort                                         |
+| D-15 | Backfill is the current FY, supplied by the FY-to-date exports and actioned by the owner                | The export already covers the year; no need to cap it at 3 months     |
 | D-16 | `user_id` on all tables from day 1; single hard-coded user in MVP                                      | Multi-tenancy readiness without building auth features early          |
 | D-17 | ICICI Amazon Pay CC out of MVP (PDF-only statements); its bill payments = "ICICI Card Spends" expense   | Defers PDF parsing; keeps reports honest via an opaque bucket         |
 | D-18 | MVP functional scope frozen as §10 (FR-1 … FR-8)                                                        | Prevents scope creep during build                                     |
@@ -291,10 +310,15 @@ Splits (one transaction, many categories — data model may anticipate it, UI la
 | D-20 | Dedupe identity: bank rows keyed on `(user, account, date, signed amount, normalized narration, balance after)`; cards keyed per statement with whole-batch replacement (§4.1). Enforced by a DB unique constraint on a versioned fingerprint | No source has a usable reference number. Measured: each real file breaks a different shorter key; the full tuple is unique across all 482 rows |
 | D-21 | An import batch commits only if its balance chain reconciles internally and joins onto the stored history; near-misses go to review, never auto-resolve (§4.1) | Turns import from plausible into provable, and catches missing statement periods for free. Verified 480/480 links on real data |
 | D-22 | Import ingests each bank's native XLSX export directly, one file per account per statement period — not the combined manually-assembled workbook (§4) | The combined workbook is a personal convenience with a different, lossier shape; §4.1's dedupe design is already built against the native columns |
+| D-23 | Imported rows not classified by a rule are **unclassified**: excluded from income and expense, held in the review inbox until the owner sets their nature | A money number is never silently wrong, only incomplete. One-sided transfers to Investments have no matcher, so the inbox is where they are caught |
+| D-24 | Each month carries a completeness state; card spend is provisional until the statement covering the month end is imported | Card cycles are not calendar months, so a recent month's card spend is not final. The owner must know when a number is safe to act on |
+| D-25 | Add a **Bank Charges & Fees** expense category; forex markup and GST rows go there | These INR rows appear on the first import and had no home; Misc would hide them |
+| D-26 | A near-miss (§4.1) is resolved by the owner as keep-as-new or treat-as-duplicate | Guessing either way loses a transaction or corrupts the audit trail |
+| D-27 | Replacing a statement batch returns any matched transfer on the replaced rows to the review inbox for re-confirmation | The replaced card row is gone, so the old link is stale; the owner re-matches against the new batch rather than trusting a broken link |
 
 ## 10. MVP functional requirements
 
-Definition of done for MVP: _the owner imports 3 months of the three in-scope statements, categorizes them with rules + manual touch-up, and trusts the monthly dashboard numbers enough to act on them._
+Definition of done for MVP: _the owner imports the three in-scope statements for the current FY to date, categorizes them with rules + manual touch-up, and trusts the monthly dashboard numbers enough to act on them._
 
 **FR-1 — Accounts.** The four accounts of §2.1 exist as seed data (no account-management UI).
 Each shows a derived balance (§2.2, §5).
@@ -311,10 +335,13 @@ Owner confirms or rejects; confirmed pairs are linked and excluded from income/e
 Unmatched sides can also be manually marked as one-sided transfers (e.g., to Investments).
 
 **FR-5 — Categorization.** Every expense gets exactly one flat category and an optional Needs/Wants tag.
-A user-editable rules engine (narration pattern → category) applies on import.
-A "needs review" inbox lists uncategorized/unmatched transactions; MVP succeeds when this inbox reaches zero for a month within minutes, not hours.
+A user-editable rules engine (narration pattern → category) applies on import and sets the nature (§2.2) with the category.
+A "needs review" inbox lists uncategorized/unclassified rows, one-sided transfers still to be marked, and import near-misses (§4.1).
+For a near-miss the owner picks **keep as a new transaction** or **treat as a duplicate** of the existing row.
+MVP succeeds when this inbox reaches zero for a month within minutes, not hours.
 
 **FR-6 — Dashboard.** Per calendar month: category-wise expenses (primary view), income vs expense, savings capacity, and invested amount (§2.6).
+Each month shows a completeness state (§5), and card spend is marked provisional until its covering statement is imported.
 Month navigation; no custom date ranges in MVP.
 
 **FR-7 — Reconciliation checkpoints.** Owner enters an account's real balance as of a date; the app shows drift vs the derived balance as a data-quality warning.
