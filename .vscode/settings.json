@@ -2,5 +2,6 @@
   "[markdown]": {
     "editor.wordWrap": "on",
     "editor.formatOnSave": false
-  }
+  },
+  "java.compile.nullAnalysis.mode": "automatic"
 }
