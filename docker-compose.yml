@@ -2,18 +2,25 @@ services:
   postgres:
     image: postgres:18-alpine
     container_name: financetracker-postgres
+    # environment vars passed into the container at startup
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-financetracker}
       POSTGRES_USER: ${POSTGRES_USER:-financetracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-financetracker_dev}
+    # forward container port 5432 to host port 5432 (in my mac)
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    # this is where the database files will be stored on the host machine, so they persist across container restarts
     # Postgres 18+ expects the mount at /var/lib/postgresql, not .../data:
     # it stores data in a major-version subdirectory so pg_upgrade can work later.
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-financetracker} -d ${POSTGRES_DB:-financetracker}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-financetracker} -d ${POSTGRES_DB:-financetracker}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
