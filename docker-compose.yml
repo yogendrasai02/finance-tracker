@@ -7,6 +7,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-financetracker}
       POSTGRES_USER: ${POSTGRES_USER:-financetracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-financetracker_dev}
+      # Read by db/init/01-roles-and-schema.sh. Local development defaults only;
+      # production injects both from the environment (SECURITY.md SR-45).
+      FT_MIGRATOR_PASSWORD: ${FT_MIGRATOR_PASSWORD:-ft_migrator_dev}
+      FT_APP_PASSWORD: ${FT_APP_PASSWORD:-ft_app_dev}
     # forward container port 5432 to host port 5432 (in my mac)
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -15,6 +19,9 @@ services:
     # it stores data in a major-version subdirectory so pg_upgrade can work later.
     volumes:
       - postgres_data:/var/lib/postgresql
+      # Scripts here run once, only when the data directory is empty.
+      # After changing anything in db/init, recreate the volume: docker compose down -v
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test:
         [
