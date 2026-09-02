@@ -1,3 +1,20 @@
 spring:
   application:
     name: backend-prod
+  datasource:
+    # ft_app: read/write on the app schema only (SECURITY.md SR-48). Every value comes from the
+    # environment; nothing is defaulted here, unlike application-local.yml.
+    url: ${DB_URL}
+    username: ${DB_APP_USERNAME}
+    password: ${DB_APP_PASSWORD}
+  flyway:
+    # ft_migrator: owns the schema, runs DDL. Kept separate from the application's own
+    # credentials above (DM-28).
+    user: ${DB_MIGRATOR_USERNAME}
+    password: ${DB_MIGRATOR_PASSWORD}
+    schemas: app
+    default-schema: app
+    create-schemas: false
+  jpa:
+    hibernate:
+      ddl-auto: none

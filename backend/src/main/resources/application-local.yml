@@ -2,9 +2,26 @@ spring:
   application:
     name: backend-local
   datasource:
-    url: jdbc:postgresql://localhost:5432/financetracker
-    username: financetracker
-    password: financetracker_dev
+    # The application connects as ft_app: read/write on the app schema, no DDL, no trigger
+    # control, no RLS bypass (db/init/01-roles-and-schema.sh, DM-28).
+    url: jdbc:postgresql://localhost:5432/financetracker?currentSchema=app
+    username: ft_app
+    password: ft_app_dev
+  flyway:
+    # Flyway connects separately, as ft_migrator, which owns the schema and can run DDL.
+    # No spring.flyway.url is set, so Spring Boot builds this connection from
+    # spring.datasource.url above, combined with the user/password here.
+    user: ft_migrator
+    password: ft_migrator_dev
+    schemas: app
+    default-schema: app
+    # The schema is created by db/init/01-roles-and-schema.sh, not by Flyway. If it's ever
+    # missing, fail loudly instead of Flyway silently creating it under different ownership.
+    create-schemas: false
+  jpa:
+    hibernate:
+      # Flyway migrations are the only thing allowed to change the schema (DATA_MODEL.md §1).
+      ddl-auto: none
 
 management:
   endpoint:
