@@ -30,7 +30,7 @@ These apply to every table and are not repeated in each section.
 | Fixed value sets | `TEXT` with a `CHECK` constraint | Native Postgres enums make adding a value a migration and irritate JPA |
 | Timestamps | `TIMESTAMPTZ`, defaulting to `now()`. Every table has `created_at`; a table whose rows change also has `updated_at` | Stores an absolute instant, not a local wall-clock reading (DM-26) |
 | Deletion | Categories and accounts are retired with `is_active`, never deleted | Deleting one would orphan historical transactions |
-| Foreign keys | Composite, carrying `user_id`. `ON DELETE RESTRICT` on ledger and reference links; `CASCADE` only for a join child with its parent | A delete rule is a decision, not a default; a ledger row is never lost by cascade (DM-24) |
+| Foreign keys | Composite, carrying `user_id`. `ON DELETE RESTRICT` on ledger and reference links; `CASCADE` only for a join child with its parent; `SET NULL` for transient candidate pointers (`related_transaction_id`) | A delete rule is a decision, not a default; a ledger row is never lost by cascade (DM-24) |
 
 ### 2.1 Naming
 
@@ -636,6 +636,7 @@ Storing the drift would be storing the answer to a question whose inputs change 
 | `transactions (statement_import_id)` partial | Batch replacement, and tracing a batch's rows |
 | `statement_imports (user_id, account_id, statement_date)` partial unique | One committed import per credit card statement |
 | `statement_import_rows (statement_import_id, row_number)` unique | Row identity within a file |
+| `statement_import_rows (user_id, related_transaction_id)` partial | Avoids table scans on raw rows when transactions are deleted |
 | `dismissed_matches (user_id, match_type, transaction_id_a, transaction_id_b)` unique | Stops a duplicate dismissal and excludes dismissed pairs from suggestions (DM-26) |
 
 The dashboard index is deliberately `(user_id, txn_date)` and not a wider covering index.
@@ -713,7 +714,7 @@ Where it needed a table or a column, nothing is built.
 | DM-21 | `transactions` gains `category_source` (`RULE`/`MANUAL`) and `category_rule_id` | Lets a changed rule re-run over only the rows it set, and never overwrite a category the owner set by hand (§8.2, SPEC §6) |
 | DM-22 | Deleting a linked transaction resolves the link first: move the membership on a manual merge, dissolve the link and reset survivors to `UNCLASSIFIED` on a batch replace; `transaction_link_members.transaction_id` is `ON DELETE RESTRICT` | The two deletes mean different things. `RESTRICT` stops any code path from silently orphaning a link; the service encodes the correct intent (§7.5, SPEC D-27) |
 | DM-23 | Every foreign key to a user-owned parent is composite and carries `user_id`; parents add `UNIQUE (user_id, id)` | Makes tenant isolation a schema guarantee, not only a query habit. A child cannot reference another user's row. Cheapest to add while tables are empty |
-| DM-24 | `ON DELETE` is explicit: `RESTRICT` on ledger and reference links, `CASCADE` only for a join child with its parent (link members with their link; dismissed matches with their transactions) | A delete rule on a ledger is a decision, not a Postgres default. A financial row must never disappear by an unplanned cascade |
+| DM-24 | `ON DELETE` is explicit: `RESTRICT` on ledger and reference links, `CASCADE` only for a join child with its parent (link members with their link; dismissed matches with their transactions), `SET NULL` for candidate pointers (`related_transaction_id`) | A delete rule on a ledger is a decision, not a Postgres default. A financial row must never disappear by an unplanned cascade, while candidate match pointers clear safely if a draft transaction is deleted |
 | DM-25 | Every table has `created_at`; a table whose rows change also has `updated_at` | Basic audit of when a row was made and last changed, set by the app or a trigger |
 | DM-26 | `dismissed_matches` carries `UNIQUE (user_id, match_type, transaction_id_a, transaction_id_b)` | The `a < b` check stops the mirror copy but not an exact duplicate. The unique constraint also serves the lookup that excludes dismissed pairs from suggestions |
 | DM-27 | `raw_cells` stores transaction-table rows only. Statement header and footer blocks — name, account number, CIF/customer ID, IFSC/MICR, branch details, credit limits — are parsed transiently for validation and never persisted (§6.2) | The application has no use for those identifiers, and data that is never stored cannot leak through a backup, a log, or a query bug. Cheapest control in the security review. An import test asserts the account number appears nowhere in the database (SECURITY.md SR-20) |
