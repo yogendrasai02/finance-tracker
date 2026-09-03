@@ -36,6 +36,19 @@ This command:
 - Preserves any existing data through volumes
 - Applies environment variables from `.env` (if present)
 
+On a genuinely first start, it also runs `db/init/01-roles-and-schema.sh`, which creates two
+Postgres roles: `ft_migrator` (owns the `app` schema, runs Flyway migrations) and `ft_app` (DML
+only, no DDL — what the application connects as). That script only runs once, against an empty
+data directory. If you change anything under `db/init`, the existing volume already has a
+database in it, so the script won't run again on its own — wipe it first:
+
+```bash
+docker compose down -v
+```
+
+`-v` deletes the stored data along with the containers, so only do this when you're fine losing
+whatever is in the local database.
+
 ## Verify Container Is Running
 
 Check if the container is running:

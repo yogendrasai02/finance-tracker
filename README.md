@@ -10,3 +10,10 @@ docker compose up -d       # start the container(s) defined here, detached (back
 docker compose logs -f     # follow Postgres's own log output
 docker compose down        # stop and remove the container; volume survives
 ```
+
+## Database roles
+
+`db/init/01-roles-and-schema.sh` creates two Postgres roles on first container start:
+`ft_migrator` (owns the `app` schema, runs Flyway migrations) and `ft_app` (DML only — what the
+application connects as). It only runs once, against an empty data directory, so a change under
+`db/init` needs `docker compose down -v` before it takes effect again.

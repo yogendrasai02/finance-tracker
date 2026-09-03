@@ -43,6 +43,19 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
+      # Local Docker creates these via docker-entrypoint-initdb.d on first start (db/init);
+      # the CI service container has no such hook, so the same script runs explicitly here.
+      # Superseded by Testcontainers in step 3.
+      - name: Bootstrap database roles
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGPASSWORD: financetracker_dev
+          POSTGRES_USER: financetracker
+          POSTGRES_DB: financetracker
+          FT_MIGRATOR_PASSWORD: ft_migrator_dev
+          FT_APP_PASSWORD: ft_app_dev
+        run: ../db/init/01-roles-and-schema.sh
       - run: ./mvnw -B verify
 
   frontend:
