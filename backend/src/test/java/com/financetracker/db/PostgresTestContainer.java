@@ -12,14 +12,16 @@ import org.testcontainers.utility.MountableFile;
  * Starting Postgres takes a few seconds, so doing it once per test class is so slow that its bad for CI/CD and for DX.
  * 
  * Nothing closes this container on purpose: Testcontainer's reaper stops it when the JVM exits.
+ *
+ * Public because BackendApplicationTests, in a different package, points the real Spring datasource and Flyway config at this same container.
  */
-final class PostgresTestContainer {
+public final class PostgresTestContainer {
 
     static final String DATABASE = "financetracker";
-    static final String MIGRATOR_USER = "ft_migrator";
-    static final String MIGRATOR_PASSWORD = "ft_migrator_test";
-    static final String APP_USER = "ft_app";
-    static final String APP_PASSWORD = "ft_app_test";
+    public static final String MIGRATOR_USER = "ft_migrator";
+    public static final String MIGRATOR_PASSWORD = "ft_migrator_test";
+    public static final String APP_USER = "ft_app";
+    public static final String APP_PASSWORD = "ft_app_test";
 
     // Maven runs with the backend module as the working directory.
     private static final Path INIT_SCRIPT = Path.of("..", "db", "init", "01-roles-and-schema.sh");
@@ -37,8 +39,7 @@ final class PostgresTestContainer {
 
         PostgreSQLContainer container = new PostgreSQLContainer("postgres:18-alpine");
         container.withDatabaseName(DATABASE)
-                // The same script local dev and CI use, so the roles cannot drift between
-                // environments (DM-33).
+                // The same script local dev and CI use, so the roles cannot drift between environments (DM-33).
                 .withCopyFileToContainer(
                         MountableFile.forHostPath(script, 0755),
                         "/docker-entrypoint-initdb.d/01-roles-and-schema.sh")
@@ -49,7 +50,7 @@ final class PostgresTestContainer {
         return container;
     }
 
-    static String jdbcUrl() {
+    public static String jdbcUrl() {
         return "jdbc:postgresql://%s:%d/%s?currentSchema=app"
                 .formatted(CONTAINER.getHost(), CONTAINER.getFirstMappedPort(), DATABASE);
     }
