@@ -140,6 +140,22 @@ final class TestFixtures {
                 userId, accountId, LocalDate.of(2026, 1, 1), amountPaise, narration);
     }
 
+    static long insertBalanceCheckpoint(Connection connection, long userId, long accountId) throws SQLException {
+        return insertBalanceCheckpoint(connection, userId, accountId, LocalDate.of(2026, 1, 1), 100_00L);
+    }
+
+    static long insertBalanceCheckpoint(
+            Connection connection, long userId, long accountId, LocalDate asOfDate, long actualBalancePaise)
+            throws SQLException {
+        return insertReturningId(
+                connection,
+                """
+                INSERT INTO app.balance_checkpoints (user_id, account_id, as_of_date, actual_balance_paise)
+                VALUES (?, ?, ?, ?) RETURNING id
+                """,
+                userId, accountId, asOfDate, actualBalancePaise);
+    }
+
     private static long insertReturningId(Connection connection, String sql, Object... parameters)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
