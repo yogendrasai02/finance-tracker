@@ -70,9 +70,8 @@ abstract class SchemaTestBase {
     }
 
     /**
-     * Runs work that is expected to be refused and returns the error, so the caller can assert on
-     * the constraint name. Postgres refuses every later statement in a transaction once one has
-     * failed, so the work runs inside a savepoint the failure is rolled back to.
+     * Runs work that is expected to be refused and returns the error, so the caller can assert on the constraint name.
+     * Postgres refuses every later statement in a transaction once one has failed, so the work runs inside a savepoint the failure is rolled back to.
      */
     protected SQLException expectFailure(Connection connection, SqlWork work) throws SQLException {
         Savepoint savepoint = connection.setSavepoint();

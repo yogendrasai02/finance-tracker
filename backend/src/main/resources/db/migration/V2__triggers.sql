@@ -124,8 +124,7 @@ CREATE TRIGGER trg_statement_imports_set_updated_at
     BEFORE UPDATE ON app.statement_imports
     FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
 
--- Alphabetically, block_update fires before set_updated_at, so a rejected update never bothers
--- stamping a timestamp on a row it isn't going to write.
+-- Alphabetically, block_update fires before set_updated_at, so a rejected update never bothers stamping a timestamp on a row it isn't going to write.
 CREATE TRIGGER trg_statement_import_rows_block_update
     BEFORE UPDATE ON app.statement_import_rows
     FOR EACH ROW EXECUTE FUNCTION app.import_rows_block_update();
