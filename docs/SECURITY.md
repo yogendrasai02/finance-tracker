@@ -250,7 +250,7 @@ This table is the shopping list.
 | Log-capture test | Logback list appender, `OutputCaptureExtension` | Runs the sensitive flows and asserts no fixture narration, amount, balance, or account number appears in captured output. Runs under the production profile | SR-29 |
 | Parser hostile-input tests | Crafted XXE, zip bomb, `.xlsm`, oversize and over-cap fixtures | Proves each limit rejects. POI's defaults are verified, never assumed | SR-11…SR-15 |
 | Header-block exclusion test | Real-shaped masked fixture | Asserts the account number and customer ID appear nowhere in the database after an import | SR-20 |
-| Immutability trigger tests | Migration + JDBC tests | The DM-02 triggers are tamper-resistance controls, so their tests are security tests | SR-70 |
+| Immutability trigger tests | Migration + JDBC tests | The DM-02 triggers are tamper-resistance controls, so their tests are security tests. Covered by `TriggerImmutabilityTest` (step 3) | SR-70 |
 | Pattern-escaping test | A rule whose pattern contains a literal `%` | Proves user patterns match literally and cannot become wildcard expressions | SR-65 |
 | Multipart disk-spill check | Effective-configuration test or inspection | Confirms an accepted upload never reaches the filesystem | SR-17 |
 
@@ -273,8 +273,8 @@ This table is the shopping list.
 | TLS on both hops | HTTPS with HSTS; JDBC `sslmode=verify-full` | Restricted data in transit, including app→DB | SR-36 |
 | Verified at-rest encryption | Provider console or API check | Must demonstrably cover `raw_cells`, the most sensitive store in the system | SR-51 |
 | Encrypted backups with a tested restore | Provider snapshots | Backups carry the same data and the same duty. An untested restore is not a backup | SR-52 |
-| Least-privilege database roles | App role: DML only, no DDL, no trigger control, no `BYPASSRLS`. Separate Flyway role | Without this, DM-02's triggers and RLS can be switched off by the app's own connection | SR-48 |
-| Row-Level Security | Postgres RLS + per-transaction `SET LOCAL` | Database backstop for tenant scoping: an unscoped query returns zero foreign rows | SR-03 |
+| Least-privilege database roles | App role: DML only, no DDL, no trigger control, no `BYPASSRLS`. Separate Flyway role | Without this, DM-02's triggers and RLS can be switched off by the app's own connection. The database half — what `ft_app` cannot do — is covered by `RolePrivilegeTest` (step 3); the application's own connection is not built yet | SR-48 |
+| Row-Level Security | Postgres RLS + per-transaction `SET LOCAL` | Database backstop for tenant scoping: an unscoped query returns zero foreign rows. The database half is covered by `RowLevelSecurityTest` and `RlsCoverageTest` (step 3); wiring `SET LOCAL app.user_id` into the application's real transactions is step 4 | SR-03 |
 | Secret store | Environment injection or a cloud secret manager | No secret in the repo, an image, or a migration | SR-45 |
 
 ### Before the closed-circle phase (not MVP)

@@ -1,5 +1,11 @@
 # README
 
+## Running backend tests
+
+`./mvnw verify` in `backend/` needs Docker running, and nothing else.
+The schema tests start their own throwaway `postgres:18-alpine` container via Testcontainers, apply the four Flyway migrations, and tear it down at the end of the run.
+A hand-started container from `docker compose up` is not required and is not used — the tests open their own connections to their own container.
+
 ## Sample docker commands
 
 In reference to `docker-componse.yml`
