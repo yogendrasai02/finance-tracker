@@ -173,9 +173,10 @@ CREATE TABLE app.transactions (
     CONSTRAINT fk_transactions_category FOREIGN KEY (user_id, category_id, transaction_type) REFERENCES app.categories (user_id, id, kind) ON DELETE RESTRICT
 );
 
+-- SET NULL names related_transaction_id explicitly: without a column list, Postgres nulls every column in a composite FK's local key, including user_id, which the DM-02 trigger below then refuses to let this UPDATE touch.
 ALTER TABLE app.statement_import_rows
     ADD CONSTRAINT fk_import_rows_related_transaction
-    FOREIGN KEY (user_id, related_transaction_id) REFERENCES app.transactions (user_id, id) ON DELETE SET NULL;
+    FOREIGN KEY (user_id, related_transaction_id) REFERENCES app.transactions (user_id, id) ON DELETE SET NULL (related_transaction_id);
 
 CREATE INDEX ix_import_rows_related_transaction
     ON app.statement_import_rows (user_id, related_transaction_id)
