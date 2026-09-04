@@ -181,6 +181,38 @@ final class TestFixtures {
                 userId, accountId, asOfDate, actualBalancePaise);
     }
 
+    /** counterpartyAccountId may be null; V1 requires it be null unless linkType is TRANSFER. */
+    static long insertTransactionLink(Connection connection, long userId, String linkType, Long counterpartyAccountId)
+            throws SQLException {
+        return insertReturningId(
+                connection,
+                "INSERT INTO app.transaction_links (user_id, link_type, counterparty_account_id) VALUES (?, ?, ?) RETURNING id",
+                userId, linkType, counterpartyAccountId);
+    }
+
+    static void insertTransactionLinkMember(Connection connection, long userId, long linkId, long transactionId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO app.transaction_link_members (link_id, transaction_id, user_id) VALUES (?, ?, ?)")) {
+            statement.setLong(1, linkId);
+            statement.setLong(2, transactionId);
+            statement.setLong(3, userId);
+            statement.execute();
+        }
+    }
+
+    static long insertDismissedMatch(
+            Connection connection, long userId, String matchType, long transactionIdA, long transactionIdB)
+            throws SQLException {
+        return insertReturningId(
+                connection,
+                """
+                INSERT INTO app.dismissed_matches (user_id, match_type, transaction_id_a, transaction_id_b)
+                VALUES (?, ?, ?, ?) RETURNING id
+                """,
+                userId, matchType, transactionIdA, transactionIdB);
+    }
+
     private static long insertReturningId(Connection connection, String sql, Object... parameters)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
