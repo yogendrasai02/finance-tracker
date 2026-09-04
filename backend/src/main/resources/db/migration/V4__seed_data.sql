@@ -1,6 +1,5 @@
--- FR-1 seed data: one user, the four accounts (§4.2), and the SPEC §3 categories. This file is
--- public (DM-16 keeps seed data out of V1), so the email below is a placeholder, not the
--- owner's real address (SECURITY.md §2) — FR-8 replaces it with a real credential later.
+-- FR-1 seed data: one user, the four accounts (§4.2), and the SPEC §3 categories.
+-- This file is public (DM-16 keeps seed data out of V1), so the email below is a placeholder, not the owner's real address (SECURITY.md §2) — FR-8 replaces it with a real credential later.
 
 INSERT INTO app.users (email, display_name)
 VALUES ('owner@financetracker.local', 'Owner');

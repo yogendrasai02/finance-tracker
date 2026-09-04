@@ -1,8 +1,6 @@
--- Row-Level Security (DM-30, §2.3): every domain table is filtered by the tenant id the
--- application sets once per transaction with SET LOCAL app.user_id. current_setting(..., true)
--- returns NULL when unset, so a forgotten SET LOCAL yields zero rows, not an error or a leak.
--- The table owner (ft_migrator) bypasses these policies regardless; ft_app is always subject to
--- them (§2.4).
+-- Row-Level Security (DM-30, §2.3): every domain table is filtered by the tenant id the application sets once per transaction with SET LOCAL app.user_id.
+-- current_setting(..., true) returns NULL when unset, so a forgotten SET LOCAL yields zero rows, not an error or a leak.
+-- The table owner (ft_migrator) bypasses these policies regardless; ft_app is always subject to them (§2.4).
 
 ALTER TABLE app.users ENABLE ROW LEVEL SECURITY;
 

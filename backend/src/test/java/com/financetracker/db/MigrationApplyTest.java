@@ -11,10 +11,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Proves the harness works: all four migrations apply to an empty database and produce the schema
- * DATA_MODEL.md describes.
- */
+/** Proves the harness works: all four migrations apply to an empty database and produce the schema DATA_MODEL.md describes. */
 class MigrationApplyTest extends SchemaTestBase {
 
     private static final List<String> EXPECTED_TABLES = List.of(
@@ -69,10 +66,9 @@ class MigrationApplyTest extends SchemaTestBase {
     }
 
     /**
-     * Every insert in V4 is a SELECT ... WHERE u.email = '...'. If that predicate ever stops
-     * matching, the insert adds zero rows and still succeeds, leaving a user with no accounts and
-     * no error anywhere. Nothing else about the seed data is asserted: names and counts are the
-     * owner's own data, not a rule the schema has to hold.
+     * Every insert in V4 is a SELECT ... WHERE u.email = '...'.
+     * If that predicate ever stops matching, the insert adds zero rows and still succeeds, leaving a user with no accounts and no error anywhere.
+     * Nothing else about the seed data is asserted: names and counts are the owner's own data, not a rule the schema has to hold.
      */
     @Test
     void seededUserHasAccountsAndCategories() throws SQLException {

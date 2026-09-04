@@ -8,11 +8,11 @@ import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Row builders for the schema tests. Each method returns the generated id.
+ * Row builders for the schema tests.
+ * Each method returns the generated id.
  *
- * These must be called on a migrator connection: the schema owner skips RLS, so it can create rows
- * belonging to any user, which is what the cross-tenant tests need. Values are synthetic and
- * generated unique per call, so no test depends on another test's data.
+ * These must be called on a migrator connection: the schema owner skips RLS, so it can create rows belonging to any user, which is what the cross-tenant tests need.
+ * Values are synthetic and generated unique per call, so no test depends on another test's data.
  */
 final class TestFixtures {
 

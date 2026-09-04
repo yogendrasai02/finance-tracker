@@ -1,10 +1,7 @@
--- updated_at stamping (DM-25) and the DM-02 immutability rules for imported transactions and
--- their raw source rows (§5.4, §6.2). No GRANT EXECUTE needed below: Postgres grants EXECUTE on
--- a new function to PUBLIC by default, unlike tables.
+-- updated_at stamping (DM-25) and the DM-02 immutability rules for imported transactions and their raw source rows (§5.4, §6.2).
+-- No GRANT EXECUTE needed below: Postgres grants EXECUTE on a new function to PUBLIC by default, unlike tables.
 --
--- Every RAISE EXCEPTION message below names the column and the rule only, never a value
--- (SR-25): the message reaches the log, and old/new amounts and narrations must never appear
--- there.
+-- Every RAISE EXCEPTION message below names the column and the rule only, never a value (SR-25): the message reaches the log, and old/new amounts and narrations must never appear there.
 
 CREATE FUNCTION app.set_updated_at() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
