@@ -289,3 +289,11 @@ use, portfolio project, closed-circle sharing later.
 
 This style makes git diffs clearer (one logical change = one line changed), is easier to review, and reads naturally in any editor.
 The reader's editor can soft-wrap long lines for display; the file itself should use semantic breaks.
+
+---
+
+# 8. Backend Coding Conventions: MUST FOLLOW STRICTLY
+
+When writing, refactoring, or testing Java Spring Boot code, strictly follow the standards defined in [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md).
+
+
