@@ -110,13 +110,37 @@ final class TestFixtures {
             long amountPaise,
             String narration)
             throws SQLException {
+        return insertImportedTransaction(
+                connection,
+                userId,
+                accountId,
+                statementImportId,
+                sourceRowId,
+                amountPaise,
+                narration,
+                "fingerprint-" + SEQUENCE.incrementAndGet(),
+                1);
+    }
+
+    /** Takes the fingerprint and its version explicitly, for tests that need two rows to collide on one. */
+    static long insertImportedTransaction(
+            Connection connection,
+            long userId,
+            long accountId,
+            long statementImportId,
+            long sourceRowId,
+            long amountPaise,
+            String narration,
+            String fingerprint,
+            int fingerprintVersion)
+            throws SQLException {
         return insertReturningId(
                 connection,
                 """
                 INSERT INTO app.transactions (
                     user_id, account_id, txn_date, amount_paise, narration, source,
                     statement_import_id, source_row_id, source_row_fingerprint, fingerprint_version)
-                VALUES (?, ?, ?, ?, ?, 'IMPORTED', ?, ?, ?, 1) RETURNING id
+                VALUES (?, ?, ?, ?, ?, 'IMPORTED', ?, ?, ?, ?) RETURNING id
                 """,
                 userId,
                 accountId,
@@ -125,7 +149,8 @@ final class TestFixtures {
                 narration,
                 statementImportId,
                 sourceRowId,
-                "fingerprint-" + SEQUENCE.incrementAndGet());
+                fingerprint,
+                fingerprintVersion);
     }
 
     static long insertManualTransaction(
