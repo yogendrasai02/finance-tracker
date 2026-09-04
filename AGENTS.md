@@ -296,4 +296,21 @@ The reader's editor can soft-wrap long lines for display; the file itself should
 
 When writing, refactoring, or testing Java Spring Boot code, strictly follow the standards defined in [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md).
 
+---
+
+# 9. Git Commit Message Conventions: MUST FOLLOW STRICTLY
+
+When writing git commit messages or creating commits, strictly follow this personal style:
+
+- Format: Single-line subject only. Never write a multi-line commit message, body, bullet list, or paragraph.
+- Casing: 100% lowercase for the entire message, including the first word.
+- Verb tense: Past tense by default (e.g., `added`, `created`, `fixed`, `updated`, `bumped`, `scaffolded`, `drafted`, `reviewed`).
+- No prefixes: Never use conventional commit tags like `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `ci:`.
+- No emojis: Never use git commit emojis.
+- No trailing period: Never end the message with a period (`.`).
+- Tone: Plain, concise, conversational engineer tone (casual conversational engineer tone)
+- Abbreviations: Use standard engineering abbreviations freely (`db`, `ci`, `rls`, `ts`, `dev`).
+- Multiple changes: Combine related actions with a comma or `and` (e.g., `fixed ci's missing db roles, documented step 2's schema decisions`).
+
+
 
