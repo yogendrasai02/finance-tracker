@@ -20,8 +20,9 @@ spring:
     create-schemas: false
   jpa:
     hibernate:
-      # Flyway migrations are the only thing allowed to change the schema (DATA_MODEL.md §1).
-      ddl-auto: none
+      # Flyway owns the schema (DATA_MODEL.md §1). validate makes Hibernate refuse to start
+      # if any entity mapping disagrees with the real tables (BACKEND_CONVENTIONS §6.1).
+      ddl-auto: validate
 
 management:
   endpoint:
