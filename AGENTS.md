@@ -326,6 +326,9 @@ Core domain rules prioritize audit-grade data integrity and ledger immutability 
 - [docs/SECURITY.md](docs/SECURITY.md): Threat model, data classifications, PII redaction, and requirements SR-01 through SR-78.
 - [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md): Architecture standards, Java conventions, and package layouts.
 - [plans/](plans/): Implementation plans for each milestone (e.g. `STEP2_PLAN.md`, `STEP3_PLAN.md`).
+- [plans/STATUS.md](plans/STATUS.md): Which step is done, which is next, and the questions carried forward.
+  It is imported by `CLAUDE.md`, so it is already in context — read the repo to confirm a detail, not to work out where the project stands.
+  When a step is finished, update this file in the same commit. A stale status file is worse than none, because it is trusted and wrong.
 
 ---
 
