@@ -2,3 +2,4 @@
 
 @AGENTS.md
 @plans/STATUS.md
+@docs/FILE_MAP.md

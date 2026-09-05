@@ -331,6 +331,9 @@ Core domain rules prioritize audit-grade data integrity and ledger immutability 
   The AI must self-update this file as and when it finishes implementing any step, sub-step, or phase.
   Make this update in the same commit or change set as the implementation work.
   A stale status file is worse than none, because it is trusted and wrong.
+- [docs/FILE_MAP.md](docs/FILE_MAP.md): Inventory table mapping repository files to their purpose.
+  The AI must self-update this map whenever a file is created, moved, renamed, or deleted.
+  Make this update in the same commit or change set as the code change.
 
 ---
 
