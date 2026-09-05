@@ -77,6 +77,10 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
 | `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
 | `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
+| `backend/src/main/java/com/financetracker/common/tenant/CurrentTenantContext.java` | Per-thread tenant, exposed only through scoped runners that always restore the previous value. |
+| `backend/src/main/java/com/financetracker/common/tenant/TenantAwareJpaTransactionManager.java` | Applies `app.user_id` to every transaction and refuses one that has no tenant. |
+| `backend/src/main/java/com/financetracker/common/tenant/MissingTenantContextException.java` | Thrown when a transaction would run with no tenant and is not a system transaction. |
+| `backend/src/main/java/com/financetracker/common/tenant/TenantConfiguration.java` | Registers the tenant-aware transaction manager in place of the auto-configured one. |
 
 ## 7. Backend Tests (`backend/src/test/`)
 
@@ -100,6 +104,9 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/SupportingTableConstraintTest.java` | Tests constraints on categories, rules, checkpoints, and imports. |
 | `backend/src/test/java/com/financetracker/db/DeleteRuleTest.java` | Proves `RESTRICT`, `CASCADE`, and `SET NULL` behaviors. |
 | `backend/src/test/java/com/financetracker/account/JpaBaselineTest.java` | DataJpaTest proving entity mappings validate and RLS is active through Hibernate. |
+| `backend/src/test/java/com/financetracker/common/tenant/CurrentTenantContextTest.java` | Proves the tenant scope restores and clears, including when the work throws. |
+| `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |
+| `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
 
 ## 8. Frontend Application (`frontend/`)
 
