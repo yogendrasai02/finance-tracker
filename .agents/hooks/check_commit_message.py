@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: enforce this repo's git commit message conventions (AGENTS.md sec 9) on Bash git commit calls.
+"""PreToolUse hook: enforce repository git commit message conventions (AGENTS.md sec 9).
 
+Supports both Antigravity and Claude Code tool execution protocols (WORA).
+
+Conventions enforced:
 Rule 1: single-line subject only, no multi-line message or body.
-Rule 2: the entire message is lowercase.
+Rule 2: the entire message is 100% lowercase, including the first word.
 Rule 3: no conventional-commit prefix (feat:, fix:, chore:, etc).
 Rule 4: no emoji.
 Rule 5: no trailing period.
-Rule 6: no reference to internal planning artifacts such as "step 3", "sub-step 3b", or "plan 3e".
-
-This is a heuristic that parses `-m "..."` and `-m '...'`, plus the `-m "$(cat <<EOF ... EOF)"`
-heredoc form, out of the raw shell command string. It only looks at the Bash command about to run.
+Rule 6: no reference to internal planning artifacts (e.g. "step 3", "sub-step 3b", "plan 3e").
 """
 
 import json
@@ -46,7 +46,7 @@ SIMPLE_M_DOUBLE_RE = re.compile(r'-m\s+"((?:[^"\\]|\\.)*)"')
 SIMPLE_M_SINGLE_RE = re.compile(r"-m\s+'((?:[^'\\]|\\.)*)'")
 
 
-def extract_message(command):
+def extract_message(command: str):
     if "git commit" not in command:
         return None
     match = HEREDOC_RE.search(command)
@@ -61,7 +61,7 @@ def extract_message(command):
     return None
 
 
-def validate(message):
+def validate(message: str):
     violations = []
     lines = message.split("\n")
     non_empty_lines = [line for line in lines if line.strip()]
@@ -76,20 +76,20 @@ def validate(message):
 
     for prefix in CONVENTIONAL_PREFIXES:
         if re.match(rf"^{prefix}(\([^)]*\))?!?:", subject, re.IGNORECASE):
-            violations.append(f"No prefixes: remove the conventional-commit tag (\"{prefix}:\").")
+            violations.append(f'No prefixes: remove the conventional-commit tag ("{prefix}:").')
             break
 
     if EMOJI_RE.search(subject):
         violations.append("No emojis: remove the emoji from the message.")
 
     if subject.endswith("."):
-        violations.append("No trailing period: remove the trailing \".\"")
+        violations.append('No trailing period: remove the trailing "."')
 
     for pattern in PLANNING_PATTERNS:
         match = pattern.search(subject)
         if match:
             violations.append(
-                f"No task references: remove \"{match.group(0)}\" and describe the change, not the plan step."
+                f'No task references: remove "{match.group(0)}" and describe the change, not the plan step.'
             )
             break
 
@@ -97,30 +97,62 @@ def validate(message):
 
 
 def main():
-    payload = json.load(sys.stdin)
-    if payload.get("tool_name") != "Bash":
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
         return 0
 
-    command = payload.get("tool_input", {}).get("command", "")
+    is_antigravity = "toolCall" in payload
+
+    command = ""
+    if is_antigravity:
+        tool_call = payload.get("toolCall", {})
+        tool_name = tool_call.get("name", "")
+        if tool_name not in ("run_command", "bash", "Bash"):
+            print(json.dumps({"decision": "allow"}))
+            return 0
+        args = tool_call.get("args", {})
+        command = args.get("CommandLine", "") or args.get("command", "")
+    else:
+        tool_name = payload.get("tool_name", "")
+        if tool_name not in ("Bash", "bash", "run_command"):
+            return 0
+        command = payload.get("tool_input", {}).get("command", "")
+
     if not command:
+        if is_antigravity:
+            print(json.dumps({"decision": "allow"}))
         return 0
 
     message = extract_message(command)
     if message is None:
+        if is_antigravity:
+            print(json.dumps({"decision": "allow"}))
         return 0
 
     violations = validate(message)
     if not violations:
+        if is_antigravity:
+            print(json.dumps({"decision": "allow"}))
         return 0
 
-    print("Commit message check failed (AGENTS.md sec 9).", file=sys.stderr)
-    print(f'  message: "{message.strip()}"', file=sys.stderr)
-    print(file=sys.stderr)
+    report_lines = [
+        "Commit message check failed (AGENTS.md sec 9).",
+        f'  message: "{message.strip()}"',
+        "",
+    ]
     for violation in violations:
-        print(f"  - {violation}", file=sys.stderr)
-    print(file=sys.stderr)
-    print("Fix the -m message and retry the commit.", file=sys.stderr)
-    return 2
+        report_lines.append(f"  - {violation}")
+    report_lines.append("")
+    report_lines.append("Fix the -m message and retry the commit.")
+    report_text = "\n".join(report_lines)
+
+    if is_antigravity:
+        print(json.dumps({"decision": "deny", "reason": report_text}))
+        return 0
+    else:
+        print(report_text, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

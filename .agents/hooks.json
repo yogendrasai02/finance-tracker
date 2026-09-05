@@ -1,0 +1,30 @@
+{
+  "commit-message-check": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.agents/hooks/check_commit_message.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "comment-style-check": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.agents/hooks/check_comment_style.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
