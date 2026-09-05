@@ -164,6 +164,10 @@ Place true cross-cutting components in `com.financetracker.common`:
 ### 6.4 Row-Level Security Awareness
 - Every connection executing domain queries under the `ft_app` role must set `SET LOCAL app.user_id = ?`.
 - Repositories and connection pools must enforce tenant context before querying domain tables.
+- This is done for you. `TenantAwareJpaTransactionManager` applies the setting at the start of every transaction, so no service, repository, or query does it by hand.
+- Set the tenant by wrapping work in `CurrentTenantContext.runAs(userId, ...)`, or `runAsSystem(...)` for the few paths with no user. There is no setter to call directly.
+- A transaction that starts with no tenant and is not a system transaction is refused with `MissingTenantContextException`, rather than returning an empty result.
+- Do not inject `EntityManager`, `DataSource` or `JdbcTemplate` outside `com.financetracker.common`. A query on a connection taken outside the transaction manager carries no tenant, and an architecture test fails the build for it.
 
 ---
 
