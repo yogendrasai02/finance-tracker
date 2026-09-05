@@ -21,7 +21,7 @@ class SchemaConventionsTest extends SchemaTestBase {
     private static final Set<String> NON_INTEGER_MONEY_TYPES = Set.of("real", "double precision", "numeric");
 
     private static final Set<String> TIMESTAMP_COLUMNS =
-            Set.of("created_at", "updated_at", "committed_at", "dismissed_at");
+            Set.of("created_at", "updated_at", "committed_at", "dismissed_at", "password_updated_at", "last_login_at");
 
     private static final List<String> DOCUMENTED_INDEXES = List.of(
             "ix_transactions_user_txn_date",

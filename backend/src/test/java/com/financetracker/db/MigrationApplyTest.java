@@ -11,7 +11,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-/** Proves the harness works: all four migrations apply to an empty database and produce the schema DATA_MODEL.md describes. */
+/** Proves the harness works: every migration applies to an empty database and produces the schema DATA_MODEL.md describes. */
 class MigrationApplyTest extends SchemaTestBase {
 
     private static final List<String> EXPECTED_TABLES = List.of(
@@ -28,7 +28,7 @@ class MigrationApplyTest extends SchemaTestBase {
             "users");
 
     @Test
-    void allFourMigrationsApplied() throws SQLException {
+    void allMigrationsApplied() throws SQLException {
         try (Connection connection = migratorConnection()) {
             List<String> versions = new ArrayList<>();
             try (PreparedStatement statement = connection.prepareStatement(
@@ -41,7 +41,7 @@ class MigrationApplyTest extends SchemaTestBase {
                     versions.add(rows.getString("version"));
                 }
             }
-            assertThat(versions).containsExactly("1", "2", "3", "4");
+            assertThat(versions).containsExactly("1", "2", "3", "4", "5");
         }
     }
 

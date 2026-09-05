@@ -105,6 +105,30 @@ class RolePrivilegeTest extends SchemaTestBase {
     }
 
     @Test
+    void cannotCreateAFunctionInAppSchema() throws SQLException {
+        try (Connection connection = appConnection()) {
+            SQLException refused = expectFailure(
+                    connection, "CREATE FUNCTION app.should_be_refused() RETURNS INT LANGUAGE sql AS 'SELECT 1'");
+            assertThat(refused.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE);
+        }
+    }
+
+    /** app.find_login_identity reads a user row with no tenant context, so replacing its body would turn one narrow exception into an open door. */
+    @Test
+    void cannotReplaceTheLoginLookupFunction() throws SQLException {
+        try (Connection connection = appConnection()) {
+            SQLException refused = expectFailure(
+                    connection,
+                    """
+                    CREATE OR REPLACE FUNCTION app.find_login_identity(p_email TEXT)
+                    RETURNS TABLE (id BIGINT, password_hash TEXT, status TEXT)
+                    LANGUAGE sql SECURITY DEFINER AS 'SELECT u.id, u.password_hash, u.status FROM app.users u'
+                    """);
+            assertThat(refused.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE);
+        }
+    }
+
+    @Test
     void ftAppCannotBypassRowLevelSecurityOrBeASuperuser() throws SQLException {
         try (Connection connection = appConnection();
                 PreparedStatement statement = connection.prepareStatement(

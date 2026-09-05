@@ -136,13 +136,18 @@ It exists now only so every other table can carry `user_id` from day 1 (D-16).
 | Column | Type | Notes |
 | ------ | ---- | ----- |
 | `id` | `BIGINT` | Primary key |
-| `email` | `TEXT` | Unique |
+| `email` | `TEXT` | Unique, lowercase only |
 | `display_name` | `TEXT` | |
+| `password_hash` | `TEXT` | Null until the credential is bootstrapped; must carry an `{algorithm}` prefix (DM-39) |
+| `password_updated_at` | `TIMESTAMPTZ` | |
+| `last_login_at` | `TIMESTAMPTZ` | |
+| `status` | `TEXT` | `ACTIVE` or `DISABLED` |
 | `created_at`, `updated_at` | `TIMESTAMPTZ` | |
 
-No password or credential columns yet.
-FR-8 is a separate piece of work and the auth mechanism is not chosen.
-Adding those columns later is a cheap migration; guessing them now produces columns nobody uses.
+The credential columns arrive in `V5`, with FR-8 (DM-39).
+No hash is ever written by a migration: the seeded owner starts with `password_hash` null and the value is set from the environment on startup (SR-40).
+
+`app.find_login_identity(email)` is the only way the application role reads a user row without a tenant id (DM-40).
 
 ### 4.2 `accounts`
 
@@ -729,3 +734,5 @@ Where it needed a table or a column, nothing is built.
 | DM-36 | The Testcontainers Postgres copies `db/init/01-roles-and-schema.sh` into its own `docker-entrypoint-initdb.d`, with the same two password environment variables | Keeps DM-33 true. A second, hand-written copy of the role definitions could silently disagree with the first |
 | DM-37 | Each schema test runs inside a transaction rolled back at the end, against one container shared for the whole test run | Starting Postgres takes seconds; doing it per test class would make the suite slow enough that people stop running it. Rollback-per-test keeps a shared container clean without cleanup code, and matches the transaction boundary `SET LOCAL app.user_id` will use in production. Exception: a test using two connections — fixtures written as `ft_migrator`, read back as `ft_app` — must commit its fixtures, since one connection cannot see another's uncommitted rows. Safe here because every fixture generates a fresh, unique user |
 | DM-38 | Conventions that must hold for every table — money as integer paise, `TIMESTAMPTZ` timestamps, every domain table carrying `user_id`, every parent carrying `UNIQUE (user_id, id)`, every domain table having Row-Level Security — are asserted by reading `information_schema` and `pg_catalog` and deriving the table list from the database itself, not by testing one table as a stand-in for the rest | A test against one table proves nothing about a table a later migration adds. A migration that breaks a convention then fails on its first run, with nobody having to remember to write a test for the new table |
+| DM-39 | `V5` adds `password_hash`, `password_updated_at`, `last_login_at` and `status` to `app.users`. There is no `password_algorithm` column, `password_hash` must match `{%}%`, and `email` must equal `lower(email)` | The encoder writes its own `{algorithm}` prefix, so the algorithm belongs with the value and can differ per row while it is being changed. The hash-format check makes storing a raw password impossible rather than merely wrong. Login matches the email exactly, so a mixed-case row would be unreachable, which is the kind of defect that looks like a forgotten password |
+| DM-40 | Login reads the user row through `app.find_login_identity(email)`: `SECURITY DEFINER`, owned by `ft_migrator`, fixed `search_path`, `EXECUTE` revoked from `PUBLIC` and granted to `ft_app`, returning `id`, `password_hash` and `status` only | The RLS policy on `app.users` compares `id` against `app.user_id`, but login has to find the row before any id exists (DM-30). The alternatives were weakening that policy or adding a third `BYPASSRLS` role; both are permanently wider than one narrow function. It works because the table owner skips its own policies (DM-32), so `app.users` must never gain `FORCE ROW LEVEL SECURITY` — a test asserts this, because the failure would be login finding no user with no error anywhere |

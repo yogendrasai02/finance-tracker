@@ -22,13 +22,14 @@ Make this update in the same commit or change set as the code change.
 | `plans/STATUS.md` | Current milestone state, completed steps, active work, and open questions. |
 | `plans/STEP2_PLAN.md` | Implementation plan for Step 2 (Flyway migrations and PostgreSQL roles). |
 | `plans/STEP3_PLAN.md` | Implementation plan for Step 3 (Schema Testcontainers test suite). |
+| `plans/STEP4_PLAN.md` | Implementation plan for Step 4 (authentication, session, and the tenant execution path). |
 
 ## 3. Documentation (`docs/`)
 
 | Path | Purpose |
 | :--- | :--- |
 | `docs/SPEC.md` | Functional requirements, financial business rules, and transaction states. |
-| `docs/DATA_MODEL.md` | Database schema, constraints, indexes, triggers, and decisions DM-01 to DM-38. |
+| `docs/DATA_MODEL.md` | Database schema, constraints, indexes, triggers, and decisions DM-01 to DM-40. |
 | `docs/SECURITY.md` | Threat model, data classifications, PII handling, and security rules SR-01 to SR-78. |
 | `docs/BACKEND_CONVENTIONS.md` | Spring Boot architecture, package-by-feature layout, and coding conventions. |
 | `docs/STATEMENT_DATA_EXPLORATION.md` | Analysis of real SBI, HDFC, and ICICI statement structures. |
@@ -54,6 +55,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/resources/db/migration/V2__triggers.sql` | Triggers enforcing bank data immutability and updating timestamps. |
 | `backend/src/main/resources/db/migration/V3__row_level_security.sql` | RLS enablement and tenant isolation policies on all domain tables. |
 | `backend/src/main/resources/db/migration/V4__seed_data.sql` | Starter user, default accounts, and standard category seeds. |
+| `backend/src/main/resources/db/migration/V5__auth.sql` | Credential columns on `app.users` and the `SECURITY DEFINER` login lookup function. |
 
 ## 6. Backend Application (`backend/src/main/`)
 
@@ -76,6 +78,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/SchemaTestBase.java` | Base JDBC test harness running Flyway once and providing role connections. |
 | `backend/src/test/java/com/financetracker/db/TestFixtures.java` | Reusable JDBC fixture generation helpers for tests. |
 | `backend/src/test/java/com/financetracker/db/MigrationApplyTest.java` | Verifies clean migration application. |
+| `backend/src/test/java/com/financetracker/db/AuthSchemaTest.java` | Proves the credential column rules hold and the login lookup is the only tenant-free read of a user. |
 | `backend/src/test/java/com/financetracker/db/SchemaConventionsTest.java` | Catalog sweep checking paise integers, UTC timestamps, and tenant keys. |
 | `backend/src/test/java/com/financetracker/db/RolePrivilegeTest.java` | Verifies `ft_app` cannot run DDL or alter triggers and policies. |
 | `backend/src/test/java/com/financetracker/db/RowLevelSecurityTest.java` | Proves RLS isolates tenant data when `app.user_id` is set or unset. |
