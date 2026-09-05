@@ -44,7 +44,13 @@ Make this update in the same commit or change set as the code change.
 | :--- | :--- |
 | `scripts/setup-hooks.sh` | Shell script to configure local git hooks. |
 | `scripts/hooks/pre-commit` | Pre-commit hook running Gitleaks against staged changes. |
-| `.claude/hooks/check_commit_message.py` | Hook verifying git commit messages follow the lowercase conventions. |
+| `.agents/hooks.json` | Antigravity lifecycle hooks configuration (commit message and comment style validation). |
+| `.agents/hooks/check_commit_message.py` | WORA hook verifying git commit messages follow AGENTS.md §9 conventions. |
+| `.agents/hooks/check_comment_style.py` | WORA hook verifying code comments follow AGENTS.md §6 and §7 conventions. |
+| `.agents/hooks/session_context.sh` | Hook gathering live git and project state on session start. |
+| `.claude/hooks` | Symlink pointing to `../.agents/hooks` for Claude Code cross-tool compatibility. |
+| `.claude/skills` | Symlink pointing to `../.agents/skills` for Claude Code cross-tool compatibility. |
+| `.claude/settings.json` | Claude Code settings configuring hooks. |
 
 ## 5. Database Initialization & Migrations
 
@@ -67,6 +73,10 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/resources/application-prod.yml` | Production configuration reading credentials from environment variables. |
 | `backend/src/main/java/com/financetracker/BackendApplication.java` | Spring Boot application entry point. |
 | `backend/src/main/java/com/financetracker/controller/HelloController.java` | Baseline probe endpoint at `GET /api/v1/hello`. |
+| `backend/src/main/java/com/financetracker/user/User.java` | JPA entity mapping `app.users` (V1 + V5 columns). |
+| `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
+| `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
+| `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
 
 ## 7. Backend Tests (`backend/src/test/`)
 
@@ -89,6 +99,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/CrossTenantConstraintTest.java` | Proves foreign keys reject cross-tenant references. |
 | `backend/src/test/java/com/financetracker/db/SupportingTableConstraintTest.java` | Tests constraints on categories, rules, checkpoints, and imports. |
 | `backend/src/test/java/com/financetracker/db/DeleteRuleTest.java` | Proves `RESTRICT`, `CASCADE`, and `SET NULL` behaviors. |
+| `backend/src/test/java/com/financetracker/account/JpaBaselineTest.java` | DataJpaTest proving entity mappings validate and RLS is active through Hibernate. |
 
 ## 8. Frontend Application (`frontend/`)
 
