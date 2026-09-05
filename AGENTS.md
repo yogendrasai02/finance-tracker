@@ -327,8 +327,10 @@ Core domain rules prioritize audit-grade data integrity and ledger immutability 
 - [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md): Architecture standards, Java conventions, and package layouts.
 - [plans/](plans/): Implementation plans for each milestone (e.g. `STEP2_PLAN.md`, `STEP3_PLAN.md`).
 - [plans/STATUS.md](plans/STATUS.md): Which step is done, which is next, and the questions carried forward.
-  It is imported by `CLAUDE.md`, so it is already in context — read the repo to confirm a detail, not to work out where the project stands.
-  When a step is finished, update this file in the same commit. A stale status file is worse than none, because it is trusted and wrong.
+  It is imported by session context, so read the repo to confirm a detail, not to work out where the project stands.
+  The AI must self-update this file as and when it finishes implementing any step, sub-step, or phase.
+  Make this update in the same commit or change set as the implementation work.
+  A stale status file is worse than none, because it is trusted and wrong.
 
 ---
 
