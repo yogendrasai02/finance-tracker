@@ -312,5 +312,99 @@ When writing git commit messages or creating commits, strictly follow this perso
 - Abbreviations: Use standard engineering abbreviations freely (`db`, `ci`, `rls`, `ts`, `dev`).
 - Multiple changes: Combine related actions with a comma or `and` (e.g., `fixed ci's missing db roles, documented step 2's schema decisions`).
 
+---
 
+# 10. Project Identity & Canonical References
 
+FinanceTracker is a personal finance tracker designed for the Indian banking and tax ecosystem.
+It handles bank savings accounts, credit cards, UPI flows, and investment transfers.
+Core domain rules prioritize audit-grade data integrity and ledger immutability over UI convenience.
+
+### Canonical Documents
+- [docs/SPEC.md](docs/SPEC.md): Functional requirements, product behavior, and business rules.
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md): Database schema, constraints, indexes, triggers, and decisions DM-01 through DM-38.
+- [docs/SECURITY.md](docs/SECURITY.md): Threat model, data classifications, PII redaction, and requirements SR-01 through SR-78.
+- [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md): Architecture standards, Java conventions, and package layouts.
+- [plans/](plans/): Implementation plans for each milestone (e.g. `STEP2_PLAN.md`, `STEP3_PLAN.md`).
+
+---
+
+# 11. Backend Architecture & Wiring Details
+
+### Runtime Baseline
+- Java 25.
+- Spring Boot 4.1.1.
+- Maven wrapper (`./mvnw`).
+- PostgreSQL 18.
+
+### Dual-Role Database Connection Model
+The application strictly enforces least-privilege separation at the database connection level (DM-28, SR-48).
+Two distinct roles exist in PostgreSQL:
+1. `ft_migrator`:
+   - Schema owner of `app`.
+   - Used only by Flyway to apply schema migrations (`V1` through `V4`).
+   - Configured under `spring.flyway.user` and `spring.flyway.password`.
+   - `spring.flyway.create-schemas` is set to `false` because schema creation is managed by [db/init/01-roles-and-schema.sh](db/init/01-roles-and-schema.sh).
+2. `ft_app`:
+   - Runtime user for Spring Boot application traffic.
+   - Configured under `spring.datasource.username` and `spring.datasource.password`.
+   - Connects to `jdbc:postgresql://<host>:<port>/financetracker?currentSchema=app`.
+   - Granted DML only (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) on tables in schema `app`.
+   - Has no DDL rights, cannot alter tables, and cannot disable triggers or bypass Row-Level Security.
+
+### Persistence & Schema Rules
+- `spring.jpa.hibernate.ddl-auto` is set to `none`.
+- Flyway migrations are the sole source of schema changes. Hibernate must never alter or create schema objects.
+- Monetary amounts are strictly signed 64-bit integer paise (`BIGINT` in SQL, `long` in Java). Unscaled decimal and floating-point types are forbidden.
+- UTC timestamps are stored as `TIMESTAMPTZ` in PostgreSQL and mapped to `Instant` in Java.
+- Transaction posting dates use `DATE` in PostgreSQL and map to `LocalDate` in Java.
+
+### Existing Codebase Inventory
+- `BackendApplication.java`: Main Spring Boot entry point.
+- `controller/HelloController.java`: Baseline probe endpoint at `GET /api/v1/hello`.
+- `controller/HelloControllerTest.java`: WebMvc slice test verifying the baseline endpoint.
+- `BackendApplicationTests.java`: Context-load test. It uses `@DynamicPropertySource` to wire the singleton container's credentials for `ft_app` and `ft_migrator`. `@ServiceConnection` is forbidden here because it bypasses the role split.
+
+### Schema Test Suite (`backend/src/test/java/com/financetracker/db/`)
+- Uses a shared singleton Testcontainer running `postgres:18-alpine` ([PostgresTestContainer.java](backend/src/test/java/com/financetracker/db/PostgresTestContainer.java)).
+- Copies [db/init/01-roles-and-schema.sh](db/init/01-roles-and-schema.sh) into the container's init directory on startup.
+- All schema tests extend [SchemaTestBase.java](backend/src/test/java/com/financetracker/db/SchemaTestBase.java) and use plain JDBC (`DriverManager.getConnection`) without loading the Spring application context.
+- Tests verify migrations, catalog conventions, role privileges, RLS enforcement, immutability triggers, composite keys, and delete rules.
+
+---
+
+# 12. Tenancy & Row-Level Security Contract
+
+Row-Level Security (RLS) is active on every domain table in schema `app` (DM-30).
+This creates a strict execution contract for backend development:
+
+1. Zero Visibility Without Context:
+   - When connected as `ft_app`, queries to domain tables return zero rows by default.
+   - To read or write rows, the connection must execute `SELECT set_config('app.user_id', ?, true)` within the transaction.
+   - The third parameter (`true`) ensures the setting is local to the current transaction.
+2. Composite Tenant Keys:
+   - Every domain parent table enforces `UNIQUE (user_id, id)`.
+   - Every foreign key carries `user_id` alongside the referenced identifier (DM-23).
+   - This prevents cross-tenant references at the foreign key constraint level.
+3. Immutability Protection:
+   - Database triggers in `V2__triggers.sql` refuse updates to core financial fields (`amount_paise`, `txn_date`, `raw_narration`) on imported bank rows.
+   - Triggers also refuse deletes of bank-imported transactions.
+
+---
+
+# 13. Verification Commands
+
+Run commands from the repository root or the specified directory:
+
+- Run schema tests & backend verification:
+  `cd backend && ./mvnw verify`
+  (Requires Docker daemon to be running for Testcontainers).
+- Fast backend compilation check:
+  `cd backend && ./mvnw test-compile`
+  (Does not require Docker).
+- Frontend lint and production build:
+  `cd frontend && npm run lint && npm run build`.
+- Local database startup:
+  `docker compose up -d`.
+- Reset local database with fresh roles and migrations:
+  `docker compose down -v && docker compose up -d`.
