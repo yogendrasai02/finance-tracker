@@ -11,7 +11,8 @@ spring:
     # No spring.flyway.url is set, so Spring Boot builds this connection from spring.datasource.url above, combined with the user/password here.
     user: ft_migrator
     password: ft_migrator_dev
-    schemas: app
+    # auth holds the session-store tables (V6); app stays the default so the schema history table does not move.
+    schemas: app,auth
     default-schema: app
     # The schema is created by db/init/01-roles-and-schema.sh, not by Flyway.
     # If it's ever missing, fail loudly instead of Flyway silently creating it under different ownership.

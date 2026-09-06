@@ -12,7 +12,7 @@ spring:
     # Kept separate from the application's own credentials above (DM-28).
     user: ${DB_MIGRATOR_USERNAME}
     password: ${DB_MIGRATOR_PASSWORD}
-    schemas: app
+    schemas: app,auth
     default-schema: app
     create-schemas: false
   jpa:
