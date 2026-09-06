@@ -35,7 +35,7 @@ abstract class SchemaTestBase {
                         PostgresTestContainer.jdbcUrl(),
                         PostgresTestContainer.MIGRATOR_USER,
                         PostgresTestContainer.MIGRATOR_PASSWORD)
-                .schemas("app")
+                .schemas("app", "auth")
                 .defaultSchema("app")
                 .createSchemas(false)
                 .locations("classpath:db/migration")
