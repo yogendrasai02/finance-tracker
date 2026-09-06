@@ -33,6 +33,7 @@ Make this update in the same commit or change set as the code change.
 | `docs/DATA_MODEL.md` | Database schema, constraints, indexes, triggers, and decisions DM-01 to DM-40. |
 | `docs/SECURITY.md` | Threat model, data classifications, PII handling, and security rules SR-01 to SR-78. |
 | `docs/BACKEND_CONVENTIONS.md` | Spring Boot architecture, package-by-feature layout, and coding conventions. |
+| `docs/FRONTEND_CONVENTIONS.md` | React 19 architecture, Tailwind CSS v4 rules, Shadcn UI discipline, and financial formatting conventions. |
 | `docs/STATEMENT_DATA_EXPLORATION.md` | Analysis of real SBI, HDFC, and ICICI statement structures. |
 | `docs/FILE_MAP.md` | Codebase inventory table mapping file paths to their responsibilities. |
 | `docs/reviews/SPEC_REVIEW.md` | Review report and approval record for SPEC.md. |
@@ -154,8 +155,17 @@ Make this update in the same commit or change set as the code change.
 
 | Path | Purpose |
 | :--- | :--- |
-| `frontend/package.json` | Frontend dependencies and scripts (React 19, TypeScript, Vite 8). |
-| `frontend/vite.config.ts` | Vite configuration with React plugin. |
-| `frontend/eslint.config.js` | ESLint configuration for React and TypeScript. |
+| `frontend/package.json` | Frontend dependencies and scripts (React 19, TypeScript, Vite 8, Tailwind v4, Shadcn). |
+| `frontend/components.json` | Shadcn UI CLI configuration (Tailwind v4, Base UI, Geist font, Nova preset). |
+| `frontend/vite.config.ts` | Vite configuration with React plugin, Tailwind v4 plugin, and `@` path alias. |
+| `frontend/tsconfig.json` | Root TypeScript project references and path alias mapping. |
+| `frontend/tsconfig.app.json` | Frontend application TypeScript compiler options with `@/*` path mapping. |
+| `frontend/eslint.config.js` | ESLint configuration for React 19, TypeScript, and Shadcn component variants. |
 | `frontend/src/main.tsx` | React application root entry point. |
-| `frontend/src/App.tsx` | Main application shell component. |
+| `frontend/src/App.tsx` | Main application shell displaying dummy Shadcn components and Tailwind v4 layout. |
+| `frontend/src/index.css` | Global stylesheet importing Tailwind CSS v4, font variables, and Shadcn semantic theme tokens. |
+| `frontend/src/lib/utils.ts` | Shared frontend utility functions, including the `cn()` class name merger. |
+| `frontend/src/components/ui/button.tsx` | Shadcn Button component supporting variants (default, secondary, outline, destructive) and sizes. |
+| `frontend/src/components/ui/card.tsx` | Shadcn Card component suite (Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter). |
+| `frontend/src/components/ui/badge.tsx` | Shadcn Badge component supporting semantic status variants. |
+| `frontend/src/components/ui/input.tsx` | Shadcn Input component for styled text inputs. |

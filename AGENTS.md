@@ -298,7 +298,13 @@ When writing, refactoring, or testing Java Spring Boot code, strictly follow the
 
 ---
 
-# 9. Git Commit Message Conventions: MUST FOLLOW STRICTLY
+# 9. Frontend Coding Conventions: MUST FOLLOW STRICTLY
+
+When writing, refactoring, or testing React TypeScript frontend code, strictly follow the standards defined in [docs/FRONTEND_CONVENTIONS.md](docs/FRONTEND_CONVENTIONS.md).
+
+---
+
+# 10. Git Commit Message Conventions: MUST FOLLOW STRICTLY
 
 When writing git commit messages or creating commits, strictly follow this personal style:
 
@@ -314,7 +320,7 @@ When writing git commit messages or creating commits, strictly follow this perso
 
 ---
 
-# 10. Project Identity & Canonical References
+# 11. Project Identity & Canonical References
 
 FinanceTracker is a personal finance tracker designed for the Indian banking and tax ecosystem.
 It handles bank savings accounts, credit cards, UPI flows, and investment transfers.
@@ -325,6 +331,7 @@ Core domain rules prioritize audit-grade data integrity and ledger immutability 
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md): Database schema, constraints, indexes, triggers, and decisions DM-01 through DM-38.
 - [docs/SECURITY.md](docs/SECURITY.md): Threat model, data classifications, PII redaction, and requirements SR-01 through SR-78.
 - [docs/BACKEND_CONVENTIONS.md](docs/BACKEND_CONVENTIONS.md): Architecture standards, Java conventions, and package layouts.
+- [docs/FRONTEND_CONVENTIONS.md](docs/FRONTEND_CONVENTIONS.md): Architecture standards, React 19 conventions, Tailwind rules, and Shadcn UI guidelines.
 - [plans/](plans/): Implementation plans for each milestone (e.g. `STEP2_PLAN.md`, `STEP3_PLAN.md`).
 - [plans/STATUS.md](plans/STATUS.md): Which step is done, which is next, and the questions carried forward.
   It is imported by session context, so read the repo to confirm a detail, not to work out where the project stands.
@@ -337,7 +344,7 @@ Core domain rules prioritize audit-grade data integrity and ledger immutability 
 
 ---
 
-# 11. Backend Architecture & Wiring Details
+# 12. Backend Architecture & Wiring Details
 
 ### Runtime Baseline
 - Java 25.
@@ -384,7 +391,7 @@ The full inventory is [docs/FILE_MAP.md](docs/FILE_MAP.md). The entries below ar
 
 ---
 
-# 12. Tenancy & Row-Level Security Contract
+# 13. Tenancy & Row-Level Security Contract
 
 Row-Level Security (RLS) is active on every domain table in schema `app` (DM-30).
 This creates a strict execution contract for backend development:
@@ -403,7 +410,7 @@ This creates a strict execution contract for backend development:
 
 ---
 
-# 13. Verification Commands
+# 14. Verification Commands
 
 Run commands from the repository root or the specified directory:
 
