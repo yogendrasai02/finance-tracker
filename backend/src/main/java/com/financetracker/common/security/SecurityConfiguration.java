@@ -44,7 +44,7 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 @EnableWebSecurity
 public class SecurityConfiguration {
 
-    private static final String LOGIN_PATH = "/api/v1/auth/login";
+    static final String LOGIN_PATH = "/api/v1/auth/login";
 
     private static final String LOGOUT_PATH = "/api/v1/auth/logout";
 
@@ -67,6 +67,7 @@ public class SecurityConfiguration {
             SecurityErrorHandler securityErrorHandler,
             TenantContextFilter tenantContextFilter,
             AbsoluteSessionTimeoutFilter absoluteSessionTimeoutFilter,
+            LoginRateLimitFilter loginRateLimitFilter,
             @Value("${server.servlet.session.cookie.name}") String sessionCookieName)
             throws Exception {
 
@@ -103,6 +104,9 @@ public class SecurityConfiguration {
                 .formLogin(login -> login.disable())
                 // Before the context is loaded, so an absolute-expired session is destroyed rather than handed over as a valid Authentication (SR-38).
                 .addFilterBefore(absoluteSessionTimeoutFilter, SecurityContextHolderFilter.class)
+                // Ahead of every other security filter, so an over-limit login is rejected before a session or a CSRF token is even considered.
+                // Registered after the line above: a custom filter class only gets a position in the chain once something has anchored it, and this filter's own anchor is that one.
+                .addFilterBefore(loginRateLimitFilter, AbsoluteSessionTimeoutFilter.class)
                 // Last in the chain, so the security context is loaded and authorization has already passed.
                 .addFilterAfter(tenantContextFilter, AuthorizationFilter.class)
                 .build();
