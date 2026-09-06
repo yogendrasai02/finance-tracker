@@ -62,6 +62,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- Server-side sessions stored in Postgres instead of JVM memory (D-34). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-session-jdbc</artifactId>
+		</dependency>
 		<!-- Argon2PasswordEncoder delegates to Bouncy Castle at runtime. -->
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
