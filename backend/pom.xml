@@ -28,8 +28,9 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
-		<!-- Not managed by the Spring Boot parent, so the version is pinned here. -->
+		<!-- Not managed by the Spring Boot parent, so the versions are pinned here. -->
 		<archunit.version>1.5.0</archunit.version>
+		<bouncycastle.version>1.85.2</bouncycastle.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -55,6 +56,20 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+		<!--
+			Only the crypto half of Spring Security is needed to hash a password.
+			The full starter arrives with the filter chain, so nothing is auto-configured yet.
+		-->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+		</dependency>
+		<!-- Argon2PasswordEncoder delegates to Bouncy Castle at runtime. -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>${bouncycastle.version}</version>
 		</dependency>
 
 		<dependency>
