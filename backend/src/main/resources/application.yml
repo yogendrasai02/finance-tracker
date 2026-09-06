@@ -33,3 +33,7 @@ ft:
     # SR-38's second, independent limit: a session is destroyed this long after it was created, even while it stays active.
     # Enforced by AbsoluteSessionTimeoutFilter, because Spring Session's own timeout is idle-only.
     absolute-timeout: 12h
+  login-rate-limit:
+    # SR-39, D-40: keyed by client IP and email together, enforced by LoginRateLimitFilter before the password check runs.
+    per-minute: 5
+    per-hour: 20
