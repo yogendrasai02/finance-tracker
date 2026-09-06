@@ -2,3 +2,4 @@ statements
 .DS_Store
 .env
 plans
+__pycache__
