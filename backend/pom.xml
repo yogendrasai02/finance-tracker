@@ -31,6 +31,7 @@
 		<!-- Not managed by the Spring Boot parent, so the versions are pinned here. -->
 		<archunit.version>1.5.0</archunit.version>
 		<bouncycastle.version>1.85.2</bouncycastle.version>
+		<bucket4j.version>8.19.0</bucket4j.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -72,6 +73,12 @@
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
 			<version>${bouncycastle.version}</version>
+		</dependency>
+		<!-- In-process login rate limiting (D-40). The jdk17 module is the one this project's Java 25 baseline should use. -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-core</artifactId>
+			<version>${bucket4j.version}</version>
 		</dependency>
 
 		<dependency>
