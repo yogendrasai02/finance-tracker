@@ -42,6 +42,7 @@ class GlobalExceptionHandlerTest {
     }
 
     /** Exists only so the test above has a real {@link java.lang.reflect.Method} to build a {@link MethodParameter} from. */
+    @SuppressWarnings("unused")
     private static void dummyValidatedMethod(String password) {
     }
 }
