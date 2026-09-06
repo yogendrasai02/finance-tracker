@@ -2,27 +2,33 @@ spring:
   application:
     name: backend-local
   datasource:
-    # The application connects as ft_app: read/write on the app schema, no DDL, no trigger
-    # control, no RLS bypass (db/init/01-roles-and-schema.sh, DM-28).
+    # The application connects as ft_app: read/write on the app schema, no DDL, no trigger control, no RLS bypass (db/init/01-roles-and-schema.sh, DM-28).
     url: jdbc:postgresql://localhost:5432/financetracker?currentSchema=app
     username: ft_app
     password: ft_app_dev
   flyway:
     # Flyway connects separately, as ft_migrator, which owns the schema and can run DDL.
-    # No spring.flyway.url is set, so Spring Boot builds this connection from
-    # spring.datasource.url above, combined with the user/password here.
+    # No spring.flyway.url is set, so Spring Boot builds this connection from spring.datasource.url above, combined with the user/password here.
     user: ft_migrator
     password: ft_migrator_dev
     schemas: app
     default-schema: app
-    # The schema is created by db/init/01-roles-and-schema.sh, not by Flyway. If it's ever
-    # missing, fail loudly instead of Flyway silently creating it under different ownership.
+    # The schema is created by db/init/01-roles-and-schema.sh, not by Flyway.
+    # If it's ever missing, fail loudly instead of Flyway silently creating it under different ownership.
     create-schemas: false
   jpa:
     hibernate:
-      # Flyway owns the schema (DATA_MODEL.md §1). validate makes Hibernate refuse to start
-      # if any entity mapping disagrees with the real tables (BACKEND_CONVENTIONS §6.1).
+      # Flyway owns the schema (DATA_MODEL.md §1).
+      # validate makes Hibernate refuse to start if any entity mapping disagrees with the real tables (BACKEND_CONVENTIONS §6.1).
       ddl-auto: validate
+
+ft:
+  owner:
+    # The seeded owner's credential, set on startup because a migration must never carry a hash (SECURITY.md SR-40).
+    # The password is empty by default, so a fresh clone starts and simply cannot log in, rather than refusing to boot.
+    # See .env.example.
+    email: ${FT_OWNER_EMAIL:owner@financetracker.local}
+    password: ${FT_OWNER_PASSWORD:}
 
 management:
   endpoint:
