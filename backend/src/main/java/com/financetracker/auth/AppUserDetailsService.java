@@ -11,13 +11,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * Turns an email address into the credential check's input, through the one privileged read in the application (D-35, DM-40).
+ * Loads what the credential check needs, through the one privileged read in the application (D-35, DM-40).
+ *
+ * This class does not verify the password.
+ * The comparison, and the dummy-hash comparison that makes an unknown email cost the same as a wrong password, are both in {@code DaoAuthenticationProvider}, wired in {@code SecurityConfiguration}.
  *
  * The lookup runs as a system transaction because login has no tenant yet.
  * Every other read of {@code app.users} stays hidden by Row-Level Security.
  *
- * Every failure here is a {@link UsernameNotFoundException}, which {@code DaoAuthenticationProvider} turns into the same {@code BadCredentialsException} a wrong password produces, after running a password comparison against a dummy hash.
- * That is what makes a wrong email and a wrong password cost the same and say the same thing (SR-39).
+ * The messages below never reach the client, and are not what makes failures uniform (SR-39).
+ * {@code DaoAuthenticationProvider} discards them, and {@code GlobalExceptionHandler} maps every {@code AuthenticationException} to one response body.
  */
 @Service
 public class AppUserDetailsService implements UserDetailsService {
