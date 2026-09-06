@@ -146,7 +146,9 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/common/security/LoginRateLimitFilterTest.java` | Real HTTP: proves the sixth login attempt in a minute for one email and client returns 429 with `Retry-After`, and that the body names no account. |
 | `backend/src/test/java/com/financetracker/common/security/LoginRateLimiterTest.java` | Plain unit test of the Bucket4j bucket math, no Spring context. |
 | `backend/src/test/java/com/financetracker/common/error/GlobalExceptionHandlerTest.java` | Plain unit test proving `NotFoundException` always maps to the same body and a validation failure never carries the rejected value. |
-| `backend/src/test/java/com/financetracker/testsupport/CookieJarHttpClient.java` | Shared hand-written cookie jar for tests that drive the application over real HTTP. |
+| `backend/src/test/java/com/financetracker/testsupport/CookieJarHttpClient.java` | Shared hand-written cookie jar for tests that drive the application over real HTTP, including arbitrary methods for the route sweep. |
+| `backend/src/test/java/com/financetracker/testsupport/TwoUserTestHarness.java` | Reusable base for IDOR tests: seeds two users with accounts and credentials once per class, and shares one session per user so the login rate limit is not spent on setup (SR-07). |
+| `backend/src/test/java/com/financetracker/security/EndpointSecurityTest.java` | Sweeps every route in every handler mapping and proves each non-public one returns 401, then proves user B gets a 404 for user A's account id. Extends `TwoUserTestHarness`. |
 
 ## 8. Frontend Application (`frontend/`)
 

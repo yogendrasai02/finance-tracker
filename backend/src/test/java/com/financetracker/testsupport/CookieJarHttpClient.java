@@ -12,7 +12,8 @@ import java.util.Map;
  * A cookie jar and nothing else, driving the running application over real HTTP.
  *
  * Written by hand rather than handed to an HTTP client library on purpose.
- * Tests built on this assert on the raw {@code Set-Cookie} attributes and on which token is echoed in which header, and a client that manages cookies for us would hide exactly those details.
+ * Tests built on this assert on the raw Set-Cookie attributes and on which token is echoed in which header.
+ * A client that manages cookies for us would hide exactly those details.
  */
 public final class CookieJarHttpClient {
 
@@ -33,16 +34,45 @@ public final class CookieJarHttpClient {
     }
 
     public HttpResponse<String> get(String path) throws IOException, InterruptedException {
-        return send(request(path).GET());
+        return send("GET", path, null);
     }
 
     public HttpResponse<String> post(String path, String body) throws IOException, InterruptedException {
-        HttpRequest.Builder request = postRequest(path, body);
+        return send("POST", path, body);
+    }
+
+    /**
+     * Sends any HTTP method for tests that sweep the routing table instead of driving one known flow.
+     *
+     * A null body means no body is sent and no content type is set.
+     * The CSRF token is attached for state-changing methods only because CsrfFilter runs before the authorization filter.
+     * Without the token a state-changing request is rejected as 403, which would hide the 401 a security sweep is trying to observe.
+     *
+     * @param method the HTTP method
+     * @param path the request path
+     * @param body the request body, or null when the request has no body
+     * @return the HTTP response
+     * @throws IOException if the request cannot be sent
+     * @throws InterruptedException if the request is interrupted
+     */
+    public HttpResponse<String> send(String method, String path, String body)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder request = request(path);
+        if (body == null) {
+            request.method(method, HttpRequest.BodyPublishers.noBody());
+        } else {
+            request.header("Content-Type", "application/json")
+                    .method(method, HttpRequest.BodyPublishers.ofString(body));
+        }
         String token = cookies.get(csrfCookieName);
-        if (token != null) {
+        if (token != null && changesState(method)) {
             request.header(csrfHeaderName, token);
         }
         return send(request);
+    }
+
+    private static boolean changesState(String method) {
+        return !("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method) || "TRACE".equals(method));
     }
 
     public HttpResponse<String> postWithoutCsrfToken(String path, String body) throws IOException, InterruptedException {
@@ -53,7 +83,10 @@ public final class CookieJarHttpClient {
         return cookies.get(name);
     }
 
-    /** The raw header for a cookie the given response set, so the attributes on it can be checked. */
+    /**
+     * Returns the raw header for a cookie set by the given response.
+     * This allows callers to check the cookie attributes.
+     */
     public String setCookieHeader(HttpResponse<String> response, String name) {
         return response.headers().allValues("set-cookie").stream()
                 .filter(value -> value.startsWith(name + "="))
@@ -84,7 +117,10 @@ public final class CookieJarHttpClient {
         return response;
     }
 
-    /** A cookie with an empty value or a zero max age is a deletion, so it leaves the jar rather than entering it. */
+    /**
+     * Stores a response cookie or removes it when the response deletes the cookie.
+     * A cookie with an empty value or a zero max age is treated as a deletion.
+     */
     private void store(String setCookie) {
         String pair = setCookie.split(";", 2)[0];
         int separator = pair.indexOf('=');
