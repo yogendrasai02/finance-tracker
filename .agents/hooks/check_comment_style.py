@@ -14,10 +14,29 @@ import json
 import re
 import sys
 
-CHECKED_EXTENSIONS = {".java", ".sql", ".sh"}
+# Markdown is deliberately absent: a leading # there is a heading, not a comment.
+CHECKED_EXTENSIONS = {".java", ".sql", ".sh", ".yml", ".yaml", ".ts", ".tsx", ".js"}
+
+# Environment templates carry # comments too, and have no extension to match on.
+CHECKED_BASENAME_PREFIX = ".env"
 
 LINE_COMMENT_RE = re.compile(r"^(\s*)(//|--|#)\s?(.*)$")
 JAVADOC_RE = re.compile(r"^(\s*)\*(?!/)\s?(.*)$")
+
+ALL_MARKERS = ("//", "--", "#")
+
+# Which marker actually starts a comment depends on the language.
+# Without this, a shell long option such as --set app_password=... reads as a SQL comment.
+MARKERS_BY_EXTENSION = {
+    ".java": ("//",),
+    ".ts": ("//",),
+    ".tsx": ("//",),
+    ".js": ("//",),
+    ".sql": ("--",),
+    ".sh": ("#",),
+    ".yml": ("#",),
+    ".yaml": ("#",),
+}
 
 SENTENCE_END_CHARS = set(".:;)")
 
@@ -28,21 +47,29 @@ PLANNING_PATTERNS = [
 ]
 
 
-def comment_text(line):
+def markers_for(file_path):
+    for extension, markers in MARKERS_BY_EXTENSION.items():
+        if file_path.endswith(extension):
+            return markers
+    return ("#",)
+
+
+def comment_text(line, markers=ALL_MARKERS):
     match = LINE_COMMENT_RE.match(line)
-    if match:
+    if match and match.group(2) in markers:
         return "line", match.group(2), match.group(3)
-    match = JAVADOC_RE.match(line)
-    if match:
-        return "javadoc", "*", match.group(2)
+    if "//" in markers:
+        match = JAVADOC_RE.match(line)
+        if match:
+            return "javadoc", "*", match.group(2)
     return None, None, None
 
 
-def find_wrapped_sentences(lines):
+def find_wrapped_sentences(lines, markers=ALL_MARKERS):
     violations = []
     for i in range(len(lines) - 1):
-        kind1, marker1, text1 = comment_text(lines[i])
-        kind2, marker2, text2 = comment_text(lines[i + 1])
+        kind1, marker1, text1 = comment_text(lines[i], markers)
+        kind2, marker2, text2 = comment_text(lines[i + 1], markers)
         if kind1 is None or kind2 is None or kind1 != kind2 or marker1 != marker2:
             continue
         text1 = text1.strip()
@@ -57,10 +84,10 @@ def find_wrapped_sentences(lines):
     return violations
 
 
-def find_planning_references(lines):
+def find_planning_references(lines, markers=ALL_MARKERS):
     violations = []
     for i, line in enumerate(lines):
-        kind, _marker, text = comment_text(line)
+        kind, _marker, text = comment_text(line, markers)
         if kind is None:
             continue
         for pattern in PLANNING_PATTERNS:
@@ -73,7 +100,9 @@ def find_planning_references(lines):
 def is_checked_file(file_path):
     if not file_path:
         return False
-    return any(file_path.endswith(ext) for ext in CHECKED_EXTENSIONS)
+    if any(file_path.endswith(ext) for ext in CHECKED_EXTENSIONS):
+        return True
+    return file_path.rsplit("/", 1)[-1].startswith(CHECKED_BASENAME_PREFIX)
 
 
 def main():
@@ -123,8 +152,9 @@ def main():
         except OSError:
             return 0
 
-    wrapped = find_wrapped_sentences(lines)
-    planning = find_planning_references(lines)
+    markers = markers_for(file_path or "")
+    wrapped = find_wrapped_sentences(lines, markers)
+    planning = find_planning_references(lines, markers)
 
     if not wrapped and not planning:
         if is_antigravity:
