@@ -368,10 +368,13 @@ Two distinct roles exist in PostgreSQL:
 - Transaction posting dates use `DATE` in PostgreSQL and map to `LocalDate` in Java.
 
 ### Existing Codebase Inventory
+The full inventory is [docs/FILE_MAP.md](docs/FILE_MAP.md). The entries below are the ones with rules attached to them.
+
 - `BackendApplication.java`: Main Spring Boot entry point.
-- `controller/HelloController.java`: Baseline probe endpoint at `GET /api/v1/hello`.
-- `controller/HelloControllerTest.java`: WebMvc slice test verifying the baseline endpoint.
 - `BackendApplicationTests.java`: Context-load test. It uses `@DynamicPropertySource` to wire the singleton container's credentials for `ft_app` and `ft_migrator`. `@ServiceConnection` is forbidden here because it bypasses the role split.
+- `common/security/SecurityConfiguration.java`: The filter chain is deny-by-default. A new endpoint is authenticated unless it is explicitly added to the small public list, and it should stay that way.
+- `common/security/TenantContextFilter.java`: Puts the logged-in user's id into `CurrentTenantContext` for the request. Nothing else should set the tenant on a request thread.
+- `common/error/ApiProblems.java`: Error bodies that must be indistinguishable are built here. Do not build one at a call site.
 
 ### Schema Test Suite (`backend/src/test/java/com/financetracker/db/`)
 - Uses a shared singleton Testcontainer running `postgres:18-alpine` ([PostgresTestContainer.java](backend/src/test/java/com/financetracker/db/PostgresTestContainer.java)).

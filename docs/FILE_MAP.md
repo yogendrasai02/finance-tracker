@@ -73,17 +73,28 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/resources/application-local.yml` | Local configuration with `ft_app` datasource and `ft_migrator` Flyway. |
 | `backend/src/main/resources/application-prod.yml` | Production configuration reading credentials from environment variables. |
 | `backend/src/main/java/com/financetracker/BackendApplication.java` | Spring Boot application entry point. |
-| `backend/src/main/java/com/financetracker/controller/HelloController.java` | Baseline probe endpoint at `GET /api/v1/hello`. |
 | `backend/src/main/java/com/financetracker/user/User.java` | JPA entity mapping `app.users` (V1 + V5 columns). |
 | `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
 | `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
 | `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
-| `backend/src/main/java/com/financetracker/user/UserService.java` | Public surface of the user feature, currently the password-hash write. |
+| `backend/src/main/java/com/financetracker/user/UserService.java` | Public surface of the user feature: the password-hash write, the profile read, and the login stamp. |
+| `backend/src/main/java/com/financetracker/user/UserProfile.java` | The identity record returned by login and `GET /api/v1/me`. |
 | `backend/src/main/java/com/financetracker/auth/PasswordEncoderConfig.java` | Delegating password encoder with Argon2id as the default algorithm. |
 | `backend/src/main/java/com/financetracker/auth/LoginIdentity.java` | Projection of the credential columns login is allowed to read. |
 | `backend/src/main/java/com/financetracker/auth/LoginIdentityRepository.java` | The one privileged read: calls `app.find_login_identity` with no tenant set. |
 | `backend/src/main/java/com/financetracker/auth/OwnerCredentialProperties.java` | Binds `FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD`. |
 | `backend/src/main/java/com/financetracker/auth/OwnerCredentialBootstrap.java` | Sets the owner's password on startup when the account has none. |
+| `backend/src/main/java/com/financetracker/auth/AppUserDetailsService.java` | Loads the credential for a login attempt, and fails uniformly for every reason it can fail. |
+| `backend/src/main/java/com/financetracker/auth/AuthenticatedUser.java` | The session principal: user id, email, and a password hash that is erased after the check. |
+| `backend/src/main/java/com/financetracker/auth/LoginRequest.java` | The validated login body. |
+| `backend/src/main/java/com/financetracker/auth/AuthController.java` | `POST /api/v1/auth/login` and `GET /api/v1/me`. |
+| `backend/src/main/java/com/financetracker/common/security/SecurityConfiguration.java` | The deny-by-default filter chain, cookie and CSRF settings, security headers, and the authentication manager. |
+| `backend/src/main/java/com/financetracker/common/security/SessionAuthenticator.java` | Checks the password and starts the session, including session fixation and CSRF token replacement. |
+| `backend/src/main/java/com/financetracker/common/security/TenantContextFilter.java` | Puts the logged-in user's id into the tenant scope for the length of one request. |
+| `backend/src/main/java/com/financetracker/common/security/SecurityErrorHandler.java` | Writes the 401 and 403 problem bodies for requests the filter chain rejects. |
+| `backend/src/main/java/com/financetracker/common/error/ApiProblems.java` | The single source of the error bodies that have to be indistinguishable from each other. |
+| `backend/src/main/java/com/financetracker/common/error/GlobalExceptionHandler.java` | The one `@RestControllerAdvice`; currently the uniform login failure. |
+| `backend/src/main/java/com/financetracker/common/tenant/TenantPrincipal.java` | The seam letting `common` read the logged-in user's id without depending on the auth feature. |
 | `backend/src/main/java/com/financetracker/common/tenant/CurrentTenantContext.java` | Per-thread tenant, exposed only through scoped runners that always restore the previous value. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantAwareJpaTransactionManager.java` | Applies `app.user_id` to every transaction and refuses one that has no tenant. |
 | `backend/src/main/java/com/financetracker/common/tenant/MissingTenantContextException.java` | Thrown when a transaction would run with no tenant and is not a system transaction. |
@@ -94,7 +105,6 @@ Make this update in the same commit or change set as the code change.
 | Path | Purpose |
 | :--- | :--- |
 | `backend/src/test/java/com/financetracker/BackendApplicationTests.java` | Spring context load test with dynamic Testcontainers properties. |
-| `backend/src/test/java/com/financetracker/controller/HelloControllerTest.java` | WebMvc slice test verifying `HelloController`. |
 | `backend/src/test/java/com/financetracker/db/PostgresTestContainer.java` | Shared singleton Testcontainer running PostgreSQL 18 with role setup. |
 | `backend/src/test/java/com/financetracker/db/SchemaTestBase.java` | Base JDBC test harness running Flyway once and providing role connections. |
 | `backend/src/test/java/com/financetracker/db/TestFixtures.java` | Reusable JDBC fixture generation helpers for tests. |
@@ -115,6 +125,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |
 | `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
 | `backend/src/test/java/com/financetracker/auth/OwnerCredentialBootstrapTest.java` | Proves the credential is hashed, set once, and kept out of the logs. |
+| `backend/src/test/java/com/financetracker/auth/AuthenticationIntegrationTest.java` | Drives login, `/me` and logout over real HTTP, checking cookie attributes, CSRF, and uniform failures. |
 
 ## 8. Frontend Application (`frontend/`)
 
