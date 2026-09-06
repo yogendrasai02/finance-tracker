@@ -3,6 +3,16 @@ spring:
     name: backend
   profiles:
     active: local
+  session:
+    # Idle timeout (D-34, D-38).
+    # The absolute lifetime below is a second, independent limit that this alone cannot give (SR-38).
+    timeout: 30m
+    jdbc:
+      # V6 migration sql file is the only thing that creates auth.spring_session; Spring Session must never create its own copy of it.
+      initialize-schema: never
+      # Schema-qualified so the session rows land in auth, not app (D-34).
+      # Spring Session builds its attributes-table name by appending _ATTRIBUTES to this value, so the result is auth.spring_session_attributes.
+      table-name: auth.spring_session
 
 server:
   servlet:
@@ -17,3 +27,9 @@ server:
         http-only: true
         secure: true
         same-site: strict
+
+ft:
+  session:
+    # SR-38's second, independent limit: a session is destroyed this long after it was created, even while it stays active.
+    # Enforced by AbsoluteSessionTimeoutFilter, because Spring Session's own timeout is idle-only.
+    absolute-timeout: 12h
