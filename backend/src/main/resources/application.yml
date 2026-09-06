@@ -3,3 +3,17 @@ spring:
     name: backend
   profiles:
     active: local
+
+server:
+  servlet:
+    session:
+      cookie:
+        # A name of our own, because JSESSIONID announces the stack to anyone reading the response.
+        name: FT_SESSION
+        # Security property attrs: SECURITY.md SR-37.
+        # http-only keeps JavaScript, and therefore any XSS bug, away from the session id.
+        # secure keeps it off plain HTTP; browsers treat http://localhost as a secure context, so local development still works.
+        # same-site strict means the browser never attaches it to a request another site started, which is the first of the two CSRF defences.
+        http-only: true
+        secure: true
+        same-site: strict
