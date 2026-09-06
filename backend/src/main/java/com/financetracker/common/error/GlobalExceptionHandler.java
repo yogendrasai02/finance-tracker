@@ -4,14 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * One place that turns an exception into a response body, so no controller has to write a try-catch (BACKEND_CONVENTIONS 5.4).
- *
- * It only handles authentication failures so far.
- * The rest of the API's error shapes — not-found, validation, constraint violations — are added as those endpoints appear.
  */
 @RestControllerAdvice
 @Slf4j
@@ -25,5 +23,23 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleAuthenticationFailure(AuthenticationException exception) {
         log.info("Login rejected: {}", exception.getClass().getSimpleName());
         return ApiProblems.invalidCredentials();
+    }
+
+    /**
+     * "Missing" and "not yours" are the same exception on purpose (SR-04, SR-78), so this handler cannot distinguish them even if it wanted to.
+     * The message is logged for whoever is debugging; it never reaches the response.
+     */
+    @ExceptionHandler(NotFoundException.class)
+    public ProblemDetail handleNotFound(NotFoundException exception) {
+        log.info("Not found: {}", exception.getMessage());
+        return ApiProblems.notFound();
+    }
+
+    /** Field names and constraint messages only. The rejected value itself never leaves this method (SECURITY.md §2). */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
+        return ApiProblems.validationFailed(exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
+                .toList());
     }
 }
