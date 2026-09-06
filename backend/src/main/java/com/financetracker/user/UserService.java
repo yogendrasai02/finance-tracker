@@ -21,11 +21,35 @@ public class UserService {
      */
     @Transactional
     public void setPasswordHash(long userId, String encodedPasswordHash) {
-        User user = userRepository
-                .findById(userId)
-                .orElseThrow(() -> new IllegalStateException("No user with id " + userId + " is visible to this tenant"));
+        User user = requireVisible(userId);
 
         user.setPasswordHash(encodedPasswordHash);
         user.setPasswordUpdatedAt(Instant.now());
+    }
+
+    /** The caller must have the tenant in scope, so a user can only ever read their own profile. */
+    @Transactional(readOnly = true)
+    public UserProfile getProfile(long userId) {
+        return toProfile(requireVisible(userId));
+    }
+
+    /**
+     * Stamps the login time and returns the profile in one transaction, because login needs both and they are the same row.
+     */
+    @Transactional
+    public UserProfile recordSuccessfulLogin(long userId) {
+        User user = requireVisible(userId);
+        user.setLastLoginAt(Instant.now());
+        return toProfile(user);
+    }
+
+    private User requireVisible(long userId) {
+        return userRepository
+                .findById(userId)
+                .orElseThrow(() -> new IllegalStateException("No user with id " + userId + " is visible to this tenant"));
+    }
+
+    private static UserProfile toProfile(User user) {
+        return new UserProfile(user.getId(), user.getEmail(), user.getDisplayName());
     }
 }
