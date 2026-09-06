@@ -1,5 +1,7 @@
 package com.financetracker.common.error;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
@@ -32,5 +34,22 @@ public final class ApiProblems {
         // A missing or stale CSRF token is the usual cause
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.FORBIDDEN, "Access denied: The request was rejected.");
+    }
+
+    /** The login endpoint's own limit (SR-39, D-40). Says nothing about which of the two limits was hit, or which account it was for. */
+    public static ProblemDetail tooManyLoginAttempts() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Too many attempts. Try again later.");
+    }
+
+    /** "This row does not exist" and "this row is not yours" (SR-04, SR-78): the one body both of them return. */
+    public static ProblemDetail notFound() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "The requested resource does not exist");
+    }
+
+    /** Field names and constraint messages only. Never the rejected value: it can be financial data (SECURITY.md §2). */
+    static ProblemDetail validationFailed(List<FieldViolation> violations) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", violations);
+        return problem;
     }
 }
