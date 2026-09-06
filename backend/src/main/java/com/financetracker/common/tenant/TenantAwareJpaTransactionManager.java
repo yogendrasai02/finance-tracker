@@ -1,6 +1,7 @@
 package com.financetracker.common.tenant;
 
 import jakarta.persistence.EntityManagerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -16,6 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * {@code set_config(..., true)} is local to the transaction, so one request's tenant cannot be read by the next request that borrows the same connection.
  * Every transaction sets the value, including the ones with no user, so what a connection carries never depends on which transaction used it last.
  */
+@Slf4j
 public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
 
     private static final String APPLY_TENANT = "select set_config('app.user_id', :userId, true)";
@@ -44,9 +46,11 @@ public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
             throw new MissingTenantContextException();
         }
 
+        log.info("Starting {} tenant transaction", userId == null ? "system" : "user");
         super.doBegin(transaction, definition);
 
         applyTenant(userId == null ? NO_TENANT : Long.toString(userId));
+        log.info("Applied {} tenant to transaction", userId == null ? "system" : "user");
     }
 
     private void applyTenant(String userId) {

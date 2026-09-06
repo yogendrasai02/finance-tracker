@@ -1,5 +1,7 @@
 package com.financetracker.common.tenant;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Holds the tenant for the current thread, so {@link TenantAwareJpaTransactionManager} can apply it to every transaction.
  *
@@ -7,6 +9,7 @@ package com.financetracker.common.tenant;
  * A caller that could set the value could also forget to clear it, and a stale value on a pooled thread is read by the next request as if it belonged to that user.
  * The scoped runners below always restore the previous value, so that failure cannot happen (SR-01).
  */
+@Slf4j
 public final class CurrentTenantContext {
 
     private static final ThreadLocal<Long> USER_ID = new ThreadLocal<>();
@@ -48,11 +51,13 @@ public final class CurrentTenantContext {
     private static <T, E extends Exception> T run(Long userId, boolean system, TenantWork<T, E> work) throws E {
         Long previousUserId = USER_ID.get();
         Boolean previousSystem = SYSTEM.get();
+        log.info("Entering {} tenant scope", system ? "system" : "user");
         apply(userId, system);
         try {
             return work.get();
         } finally {
             apply(previousUserId, Boolean.TRUE.equals(previousSystem));
+            log.info("Leaving {} tenant scope", system ? "system" : "user");
         }
     }
 
