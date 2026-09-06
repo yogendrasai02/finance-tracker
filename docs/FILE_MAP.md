@@ -13,6 +13,7 @@ Make this update in the same commit or change set as the code change.
 | `GEMINI.md` | Session context loader for Antigravity / Gemini. |
 | `README.md` | Quickstart guide and Docker / test commands. |
 | `docker-compose.yml` | Local PostgreSQL 18 service with healthcheck and volume configuration. |
+| `.env.example` | Template for the gitignored `.env`, listing the owner credential and database variables. |
 | `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and frontend build. |
 
 ## 2. Plans & Status (`plans/`)
@@ -77,6 +78,12 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
 | `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
 | `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
+| `backend/src/main/java/com/financetracker/user/UserService.java` | Public surface of the user feature, currently the password-hash write. |
+| `backend/src/main/java/com/financetracker/auth/PasswordEncoderConfig.java` | Delegating password encoder with Argon2id as the default algorithm. |
+| `backend/src/main/java/com/financetracker/auth/LoginIdentity.java` | Projection of the credential columns login is allowed to read. |
+| `backend/src/main/java/com/financetracker/auth/LoginIdentityRepository.java` | The one privileged read: calls `app.find_login_identity` with no tenant set. |
+| `backend/src/main/java/com/financetracker/auth/OwnerCredentialProperties.java` | Binds `FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD`. |
+| `backend/src/main/java/com/financetracker/auth/OwnerCredentialBootstrap.java` | Sets the owner's password on startup when the account has none. |
 | `backend/src/main/java/com/financetracker/common/tenant/CurrentTenantContext.java` | Per-thread tenant, exposed only through scoped runners that always restore the previous value. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantAwareJpaTransactionManager.java` | Applies `app.user_id` to every transaction and refuses one that has no tenant. |
 | `backend/src/main/java/com/financetracker/common/tenant/MissingTenantContextException.java` | Thrown when a transaction would run with no tenant and is not a system transaction. |
@@ -107,6 +114,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/common/tenant/CurrentTenantContextTest.java` | Proves the tenant scope restores and clears, including when the work throws. |
 | `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |
 | `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
+| `backend/src/test/java/com/financetracker/auth/OwnerCredentialBootstrapTest.java` | Proves the credential is hashed, set once, and kept out of the logs. |
 
 ## 8. Frontend Application (`frontend/`)
 
