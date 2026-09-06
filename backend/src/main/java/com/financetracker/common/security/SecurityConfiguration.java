@@ -12,7 +12,6 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -98,8 +97,8 @@ public class SecurityConfiguration {
                         .httpStrictTransportSecurity(
                                 hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(HSTS_MAX_AGE_SECONDS)))
                 // Neither is used, and both would otherwise offer a second way in.
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(basic -> basic.disable())
+                .formLogin(login -> login.disable())
                 // Last in the chain, so the security context is loaded and authorization has already passed.
                 .addFilterAfter(tenantContextFilter, AuthorizationFilter.class)
                 .build();
