@@ -57,13 +57,10 @@
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
-		<!--
-			Only the crypto half of Spring Security is needed to hash a password.
-			The full starter arrives with the filter chain, so nothing is auto-configured yet.
-		-->
+		<!-- The filter chain, the session cookie, CSRF, and the password encoder. -->
 		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-core</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 		<!-- Argon2PasswordEncoder delegates to Bouncy Castle at runtime. -->
 		<dependency>
@@ -95,6 +92,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-flyway-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
