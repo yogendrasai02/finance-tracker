@@ -63,14 +63,27 @@ ALTER DEFAULT PRIVILEGES FOR ROLE ft_migrator IN SCHEMA app
 ALTER DEFAULT PRIVILEGES FOR ROLE ft_migrator IN SCHEMA app
     GRANT USAGE, SELECT ON SEQUENCES TO ft_app;
 
+-- Sessions live outside app on purpose (D-34, STEP4_PLAN.md 4f).
+-- Every table in app is tenant-owned: RLS enabled, a tenant_isolation policy, a NOT NULL user_id, checked by RlsCoverageTest and SchemaConventionsTest against the whole schema.
+-- A session is what establishes the tenant, so it cannot itself be tenant-scoped without being circular.
+-- A second schema keeps that convention absolute instead of making the session table its first exception.
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION ft_migrator;
+
+GRANT USAGE ON SCHEMA auth TO ft_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE ft_migrator IN SCHEMA auth
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ft_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE ft_migrator IN SCHEMA auth
+    GRANT USAGE, SELECT ON SEQUENCES TO ft_app;
+
 -- Nothing in this application uses the public schema.
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
 -- Convenience for psql sessions.
 -- The application sets currentSchema on the JDBC URL as well, so it does not depend on this.
-ALTER ROLE ft_migrator IN DATABASE :"db_name" SET search_path = app;
-ALTER ROLE ft_app      IN DATABASE :"db_name" SET search_path = app;
+ALTER ROLE ft_migrator IN DATABASE :"db_name" SET search_path = app, auth;
+ALTER ROLE ft_app      IN DATABASE :"db_name" SET search_path = app, auth;
 
 EOSQL
 
-echo "01-roles-and-schema: created schema 'app', roles 'ft_migrator' and 'ft_app'"
+echo "01-roles-and-schema: created schemas 'app' and 'auth', roles 'ft_migrator' and 'ft_app'"
