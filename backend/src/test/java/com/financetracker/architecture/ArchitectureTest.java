@@ -1,10 +1,12 @@
 package com.financetracker.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -53,6 +55,16 @@ class ArchitectureTest {
             .should()
             .resideInAPackage("com.financetracker.common.tenant..")
             .because("a second transaction manager would begin transactions without applying the tenant");
+
+    @ArchTest
+    static final ArchRule commonDoesNotDependOnAnyFeature = noClasses()
+            .that()
+            .resideInAPackage("com.financetracker.common..")
+            .should()
+            .dependOnClassesThat(resideInAPackage("com.financetracker..")
+                    .and(DescribedPredicate.not(resideInAPackage("com.financetracker.common.."))))
+            .because("shared code that reaches back into a feature stops being shared, "
+                    + "and the tenant filter needs the logged-in user's id without knowing what the login feature calls its principal");
 
     @ArchTest
     static final ArchRule controllersDoNotUseRepositories = noClasses()
