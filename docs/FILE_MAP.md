@@ -57,12 +57,13 @@ Make this update in the same commit or change set as the code change.
 
 | Path | Purpose |
 | :--- | :--- |
-| `db/init/01-roles-and-schema.sh` | Container startup script creating `app` schema, `ft_migrator`, and `ft_app` roles. |
+| `db/init/01-roles-and-schema.sh` | Container startup script creating the `app` and `auth` schemas, `ft_migrator`, and `ft_app` roles. |
 | `backend/src/main/resources/db/migration/V1__base_schema.sql` | Base DDL creating all 11 domain tables, composite keys, and indexes. |
 | `backend/src/main/resources/db/migration/V2__triggers.sql` | Triggers enforcing bank data immutability and updating timestamps. |
 | `backend/src/main/resources/db/migration/V3__row_level_security.sql` | RLS enablement and tenant isolation policies on all domain tables. |
 | `backend/src/main/resources/db/migration/V4__seed_data.sql` | Starter user, default accounts, and standard category seeds. |
 | `backend/src/main/resources/db/migration/V5__auth.sql` | Credential columns on `app.users` and the `SECURITY DEFINER` login lookup function. |
+| `backend/src/main/resources/db/migration/V6__session_store.sql` | Spring Session JDBC's session tables, created in the `auth` schema instead of `app`. |
 
 ## 6. Backend Application (`backend/src/main/`)
 
@@ -92,6 +93,9 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/common/security/SessionAuthenticator.java` | Checks the password and starts the session, including session fixation and CSRF token replacement. |
 | `backend/src/main/java/com/financetracker/common/security/TenantContextFilter.java` | Puts the logged-in user's id into the tenant scope for the length of one request. |
 | `backend/src/main/java/com/financetracker/common/security/SecurityErrorHandler.java` | Writes the 401 and 403 problem bodies for requests the filter chain rejects. |
+| `backend/src/main/java/com/financetracker/common/security/SessionStoreConfiguration.java` | The plain, non-tenant-aware transaction manager Spring Session JDBC uses to read and write session rows. |
+| `backend/src/main/java/com/financetracker/common/security/SessionProperties.java` | Binds `ft.session.absolute-timeout`, SR-38's second, independent session lifetime. |
+| `backend/src/main/java/com/financetracker/common/security/AbsoluteSessionTimeoutFilter.java` | Invalidates a session once it is older than the configured absolute lifetime, regardless of activity. |
 | `backend/src/main/java/com/financetracker/common/error/ApiProblems.java` | The single source of the error bodies that have to be indistinguishable from each other. |
 | `backend/src/main/java/com/financetracker/common/error/GlobalExceptionHandler.java` | The one `@RestControllerAdvice`; currently the uniform login failure. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantPrincipal.java` | The seam letting `common` read the logged-in user's id without depending on the auth feature. |
@@ -110,6 +114,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/TestFixtures.java` | Reusable JDBC fixture generation helpers for tests. |
 | `backend/src/test/java/com/financetracker/db/MigrationApplyTest.java` | Verifies clean migration application. |
 | `backend/src/test/java/com/financetracker/db/AuthSchemaTest.java` | Proves the credential column rules hold and the login lookup is the only tenant-free read of a user. |
+| `backend/src/test/java/com/financetracker/db/SessionStoreSchemaTest.java` | Proves V6's session tables exist in `auth`, carry no Row-Level Security, and are reachable by `ft_app`. |
 | `backend/src/test/java/com/financetracker/db/SchemaConventionsTest.java` | Catalog sweep checking paise integers, UTC timestamps, and tenant keys. |
 | `backend/src/test/java/com/financetracker/db/RolePrivilegeTest.java` | Verifies `ft_app` cannot run DDL or alter triggers and policies. |
 | `backend/src/test/java/com/financetracker/db/RowLevelSecurityTest.java` | Proves RLS isolates tenant data when `app.user_id` is set or unset. |
@@ -126,6 +131,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
 | `backend/src/test/java/com/financetracker/auth/OwnerCredentialBootstrapTest.java` | Proves the credential is hashed, set once, and kept out of the logs. |
 | `backend/src/test/java/com/financetracker/auth/AuthenticationIntegrationTest.java` | Drives login, `/me` and logout over real HTTP, checking cookie attributes, CSRF, and uniform failures. |
+| `backend/src/test/java/com/financetracker/common/security/SessionStoreTest.java` | Proves the session lives in `auth.spring_session`: a row appears on login, disappears on logout, and disappears when the absolute lifetime is exceeded. |
 
 ## 8. Frontend Application (`frontend/`)
 
