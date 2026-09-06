@@ -24,6 +24,7 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.DelegatingSecurityContextRepository;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
@@ -65,6 +66,7 @@ public class SecurityConfiguration {
             SecurityContextRepository securityContextRepository,
             SecurityErrorHandler securityErrorHandler,
             TenantContextFilter tenantContextFilter,
+            AbsoluteSessionTimeoutFilter absoluteSessionTimeoutFilter,
             @Value("${server.servlet.session.cookie.name}") String sessionCookieName)
             throws Exception {
 
@@ -99,6 +101,8 @@ public class SecurityConfiguration {
                 // Neither is used, and both would otherwise offer a second way in.
                 .httpBasic(basic -> basic.disable())
                 .formLogin(login -> login.disable())
+                // Before the context is loaded, so an absolute-expired session is destroyed rather than handed over as a valid Authentication (SR-38).
+                .addFilterBefore(absoluteSessionTimeoutFilter, SecurityContextHolderFilter.class)
                 // Last in the chain, so the security context is loaded and authorization has already passed.
                 .addFilterAfter(tenantContextFilter, AuthorizationFilter.class)
                 .build();
