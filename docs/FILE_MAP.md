@@ -96,8 +96,15 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/common/security/SessionStoreConfiguration.java` | The plain, non-tenant-aware transaction manager Spring Session JDBC uses to read and write session rows. |
 | `backend/src/main/java/com/financetracker/common/security/SessionProperties.java` | Binds `ft.session.absolute-timeout`, SR-38's second, independent session lifetime. |
 | `backend/src/main/java/com/financetracker/common/security/AbsoluteSessionTimeoutFilter.java` | Invalidates a session once it is older than the configured absolute lifetime, regardless of activity. |
+| `backend/src/main/java/com/financetracker/common/security/LoginRateLimitProperties.java` | Binds `ft.login-rate-limit.per-minute` and `.per-hour` (SR-39, D-40). |
+| `backend/src/main/java/com/financetracker/common/security/LoginRateLimiter.java` | One Bucket4j bucket per key, holding the two stacked limits. |
+| `backend/src/main/java/com/financetracker/common/security/CachedBodyHttpServletRequest.java` | Reads a request body into memory once so a filter and the controller behind it can both read it. |
+| `backend/src/main/java/com/financetracker/common/security/LoginRateLimitFilter.java` | Rejects an over-limit login attempt before the password check runs, keyed by client IP and the submitted email. |
 | `backend/src/main/java/com/financetracker/common/error/ApiProblems.java` | The single source of the error bodies that have to be indistinguishable from each other. |
-| `backend/src/main/java/com/financetracker/common/error/GlobalExceptionHandler.java` | The one `@RestControllerAdvice`; currently the uniform login failure. |
+| `backend/src/main/java/com/financetracker/common/error/GlobalExceptionHandler.java` | The one `@RestControllerAdvice`: the uniform login failure, not-found, and validation-failure mappings. |
+| `backend/src/main/java/com/financetracker/common/error/ProblemResponseWriter.java` | Writes a `ProblemDetail` straight to a servlet response, for the code that runs before a controller can return one. |
+| `backend/src/main/java/com/financetracker/common/error/NotFoundException.java` | The one exception every feature throws for both "missing" and "not yours" (SR-04, SR-78). |
+| `backend/src/main/java/com/financetracker/common/error/FieldViolation.java` | A field name and constraint message, never the rejected value, for a validation-failure body. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantPrincipal.java` | The seam letting `common` read the logged-in user's id without depending on the auth feature. |
 | `backend/src/main/java/com/financetracker/common/tenant/CurrentTenantContext.java` | Per-thread tenant, exposed only through scoped runners that always restore the previous value. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantAwareJpaTransactionManager.java` | Applies `app.user_id` to every transaction and refuses one that has no tenant. |
@@ -132,6 +139,10 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/auth/OwnerCredentialBootstrapTest.java` | Proves the credential is hashed, set once, and kept out of the logs. |
 | `backend/src/test/java/com/financetracker/auth/AuthenticationIntegrationTest.java` | Drives login, `/me` and logout over real HTTP, checking cookie attributes, CSRF, and uniform failures. |
 | `backend/src/test/java/com/financetracker/common/security/SessionStoreTest.java` | Proves the session lives in `auth.spring_session`: a row appears on login, disappears on logout, and disappears when the absolute lifetime is exceeded. |
+| `backend/src/test/java/com/financetracker/common/security/LoginRateLimitFilterTest.java` | Real HTTP: proves the sixth login attempt in a minute for one email and client returns 429 with `Retry-After`, and that the body names no account. |
+| `backend/src/test/java/com/financetracker/common/security/LoginRateLimiterTest.java` | Plain unit test of the Bucket4j bucket math, no Spring context. |
+| `backend/src/test/java/com/financetracker/common/error/GlobalExceptionHandlerTest.java` | Plain unit test proving `NotFoundException` always maps to the same body and a validation failure never carries the rejected value. |
+| `backend/src/test/java/com/financetracker/testsupport/CookieJarHttpClient.java` | Shared hand-written cookie jar for tests that drive the application over real HTTP. |
 
 ## 8. Frontend Application (`frontend/`)
 
