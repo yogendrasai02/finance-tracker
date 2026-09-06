@@ -2,19 +2,14 @@ package com.financetracker.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import com.financetracker.db.PostgresTestContainer;
+import com.financetracker.testsupport.CookieJarHttpClient;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,13 +66,13 @@ class AuthenticationIntegrationTest {
 
     private String email;
 
-    private Browser browser;
+    private CookieJarHttpClient browser;
 
     @BeforeEach
     void createUserWithACredential() throws SQLException {
         email = createUser();
         bootstrap.bootstrap(email, PASSWORD);
-        browser = new Browser();
+        browser = new CookieJarHttpClient(port, CSRF_COOKIE, CSRF_HEADER);
     }
 
     @Test
@@ -235,85 +230,5 @@ class AuthenticationIntegrationTest {
             statement.execute();
         }
         return address;
-    }
-
-    /**
-     * A cookie jar and nothing else.
-     *
-     * Written by hand rather than handed to an HTTP client library on purpose: the assertions are about the raw {@code Set-Cookie} attributes and about which token is echoed in which header, and a client that manages cookies for us would hide exactly those details.
-     */
-    private final class Browser {
-
-        private final HttpClient client = HttpClient.newHttpClient();
-
-        private final Map<String, String> cookies = new LinkedHashMap<>();
-
-        HttpResponse<String> get(String path) throws IOException, InterruptedException {
-            return send(request(path).GET());
-        }
-
-        HttpResponse<String> post(String path, String body) throws IOException, InterruptedException {
-            HttpRequest.Builder request = postRequest(path, body);
-            String token = cookies.get(CSRF_COOKIE);
-            if (token != null) {
-                request.header(CSRF_HEADER, token);
-            }
-            return send(request);
-        }
-
-        HttpResponse<String> postWithoutCsrfToken(String path, String body) throws IOException, InterruptedException {
-            return send(postRequest(path, body));
-        }
-
-        String cookie(String name) {
-            return cookies.get(name);
-        }
-
-        /** The raw header for a cookie the given response set, so the attributes on it can be checked. */
-        String setCookieHeader(HttpResponse<String> response, String name) {
-            return response.headers().allValues("set-cookie").stream()
-                    .filter(value -> value.startsWith(name + "="))
-                    .reduce((first, second) -> second)
-                    .orElse(null);
-        }
-
-        private HttpRequest.Builder postRequest(String path, String body) {
-            return request(path)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body));
-        }
-
-        private HttpRequest.Builder request(String path) {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
-            if (!cookies.isEmpty()) {
-                builder.header("Cookie", cookies.entrySet().stream()
-                        .map(entry -> entry.getKey() + "=" + entry.getValue())
-                        .reduce((first, second) -> first + "; " + second)
-                        .orElseThrow());
-            }
-            return builder;
-        }
-
-        private HttpResponse<String> send(HttpRequest.Builder request) throws IOException, InterruptedException {
-            HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
-            response.headers().allValues("set-cookie").forEach(this::store);
-            return response;
-        }
-
-        /** A cookie with an empty value or a zero max age is a deletion, so it leaves the jar rather than entering it. */
-        private void store(String setCookie) {
-            String pair = setCookie.split(";", 2)[0];
-            int separator = pair.indexOf('=');
-            if (separator < 0) {
-                return;
-            }
-            String name = pair.substring(0, separator).trim();
-            String value = pair.substring(separator + 1).trim();
-            if (value.isEmpty() || setCookie.contains("Max-Age=0")) {
-                cookies.remove(name);
-            } else {
-                cookies.put(name, value);
-            }
-        }
     }
 }
