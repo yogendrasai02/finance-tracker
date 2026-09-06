@@ -78,6 +78,9 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
 | `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
 | `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
+| `backend/src/main/java/com/financetracker/account/AccountResponse.java` | FR-1's response DTO: id, name, type, active — no balance yet and no dedup method. |
+| `backend/src/main/java/com/financetracker/account/AccountService.java` | Lists the caller's accounts; logs how many were found. Tenant scoping and RLS do the filtering, not this class. |
+| `backend/src/main/java/com/financetracker/account/AccountController.java` | `GET /api/v1/accounts`, the first tenant-scoped, domain-data endpoint. |
 | `backend/src/main/java/com/financetracker/user/UserService.java` | Public surface of the user feature: the password-hash write, the profile read, and the login stamp. |
 | `backend/src/main/java/com/financetracker/user/UserProfile.java` | The identity record returned by login and `GET /api/v1/me`. |
 | `backend/src/main/java/com/financetracker/auth/PasswordEncoderConfig.java` | Delegating password encoder with Argon2id as the default algorithm. |
@@ -133,6 +136,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/SupportingTableConstraintTest.java` | Tests constraints on categories, rules, checkpoints, and imports. |
 | `backend/src/test/java/com/financetracker/db/DeleteRuleTest.java` | Proves `RESTRICT`, `CASCADE`, and `SET NULL` behaviors. |
 | `backend/src/test/java/com/financetracker/account/JpaBaselineTest.java` | DataJpaTest proving entity mappings validate and RLS is active through Hibernate. |
+| `backend/src/test/java/com/financetracker/account/AccountsIntegrationTest.java` | Real HTTP: an authenticated caller gets their own accounts, an unauthenticated one gets 401, and two tenants never see each other's rows. |
 | `backend/src/test/java/com/financetracker/common/tenant/CurrentTenantContextTest.java` | Proves the tenant scope restores and clears, including when the work throws. |
 | `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |
 | `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
