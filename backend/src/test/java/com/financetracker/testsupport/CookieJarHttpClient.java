@@ -71,10 +71,6 @@ public final class CookieJarHttpClient {
         return send(request);
     }
 
-    private static boolean changesState(String method) {
-        return !("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method) || "TRACE".equals(method));
-    }
-
     public HttpResponse<String> postWithoutCsrfToken(String path, String body) throws IOException, InterruptedException {
         return send(postRequest(path, body));
     }
@@ -92,6 +88,11 @@ public final class CookieJarHttpClient {
                 .filter(value -> value.startsWith(name + "="))
                 .reduce((first, second) -> second)
                 .orElse(null);
+    }
+
+    /** True for the methods CSRF protection applies to, which is every method except the safe ones. */
+    private static boolean changesState(String method) {
+        return !("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method) || "TRACE".equals(method));
     }
 
     private HttpRequest.Builder postRequest(String path, String body) {
