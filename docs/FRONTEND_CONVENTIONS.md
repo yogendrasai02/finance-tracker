@@ -10,7 +10,8 @@ All AI agents and developers must strictly adhere to these practices.
 ### 1.1 Imports
 - Wildcard imports are forbidden, except when required by third-party libraries (e.g., `import * as React from 'react'`).
 - Every import statement must name imported members explicitly.
-- Use path aliases (`@/...`) for internal imports instead of deep relative paths (`../../`).
+- Use path aliases (`@/...`) to cross a boundary: from a feature into `@/lib`, `@/components`, or another feature's public surface.
+- Use relative imports for siblings inside the same feature (`./authApi`, `../useAuth`). Never go up more than one level; if you need `../../`, the import is crossing a boundary and should use `@/`.
 - Keep imports ordered: external dependencies first, internal shared aliases second (`@/components`, `@/lib`), feature-local imports third.
 
 ### 1.2 TypeScript Strict Baseline
@@ -41,6 +42,12 @@ All AI agents and developers must strictly adhere to these practices.
 - Never write custom hooks that duplicate standard browser APIs when simple primitives suffice.
 - Ensure all effect dependencies are complete and accurate.
 - Do not use `useEffect` for data transformation that can be computed during render.
+- Distinguish client state from server state. Client state is `useState` or context. Server state is anything the backend owns, and it belongs to TanStack Query (§9), never to a hand-written `useEffect` plus `useState` pair.
+
+### 2.3 The One Allowed Class Component
+- `src/components/AppErrorBoundary.tsx` is a class because React still provides no hook that catches a render error.
+- It is the only exception to the rule above. Any other class component is a mistake.
+- The boundary shows a generic message. It never renders the error text, which can carry backend detail the user should not see.
 
 ---
 
@@ -90,6 +97,11 @@ All AI agents and developers must strictly adhere to these practices.
 - Icons inside buttons must use `data-icon="inline-start"` or `data-icon="inline-end"`.
 - Do not add manual sizing classes to icons inside components that handle icon sizing automatically.
 
+### 4.4 Document Structure
+- Every page renders its own `<main>` and exactly one `<h1>`, which names that page.
+- The app header is a `<header>` and its brand text is not a heading. It repeats on every page and would otherwise compete with the page's own `<h1>`.
+- A loading region carries `role="status"` and an `aria-label`, so it is announced and so tests can wait for it.
+
 ---
 
 ## 5. Directory Structure: Feature-Driven Layout
@@ -101,27 +113,43 @@ frontend/src/
 ├── assets/                  # Static assets and images
 ├── components/
 │   ├── ui/                  # Shadcn UI primitives (button, card, dialog, etc.)
-│   └── layout/              # App shell, navigation header, sidebar
+│   ├── layout/              # App shell, navigation header, sidebar
+│   ├── AppErrorBoundary.tsx # Catches a render throw so a bug does not blank the page
+│   └── QueryProvider.tsx    # Builds the one TanStack Query client, wired to the auth 401 handler
 ├── features/
 │   ├── auth/                # Login, session state, credentials
-│   │   ├── api/             # Auth API calls (login, logout, getMe)
-│   │   ├── components/      # LoginForm, AuthGuard
-│   │   └── types/           # Auth DTOs and principal types
+│   │   ├── index.ts         # The feature's public surface, and the only file others may import
+│   │   ├── authApi.ts       # login, logout, getMe
+│   │   ├── authContext.ts   # The context object and its types, no component
+│   │   ├── useAuth.ts       # The hook every other part of the app reads auth state through
+│   │   ├── types.ts         # UserProfile
+│   │   ├── components/      # AuthProvider, LoginForm, ProtectedRoute
+│   │   └── pages/           # LoginPage
 │   ├── accounts/            # Accounts list, account card, summary
-│   │   ├── api/             # Account API calls
-│   │   ├── components/      # AccountCard, AccountList
-│   │   └── types/           # AccountResponse, AccountType
+│   │   ├── index.ts
+│   │   ├── accountsApi.ts   # Calls and the query keys that name them
+│   │   ├── types.ts         # AccountResponse, AccountType
+│   │   ├── AccountList.tsx
+│   │   └── AccountsPage.tsx
 │   ├── statements/          # Statement upload, parsing preview
 │   ├── transactions/        # Transaction ledger, quick entry, filters
 │   └── dashboard/           # Metrics cards, income vs expense charts
 ├── hooks/                   # Cross-cutting custom hooks (theme, media queries)
-├── lib/                     # Utilities (utils.ts, apiClient.ts, formatters.ts)
+├── lib/                     # apiClient.ts, queryClient.ts, money.ts, routes.ts, utils.ts
+├── test/                    # Test harness: MSW server, handlers, provider render helper
 └── types/                   # Cross-cutting application types
 ```
 
-### 5.1 Cross-Feature Boundaries
-- Feature components may import from `src/components/ui/`, `src/lib/`, and `src/hooks/`.
-- A feature must not directly import internal components or internal state from another feature.
+### 5.1 Feature Subfolders Are Earned, Not Required
+- Start a feature flat. Add `api/`, `components/`, `pages/`, or `types/` only when that folder would hold more than one file.
+- A folder containing a single file adds a directory level and gives nothing back.
+- Split a feature into subfolders once it grows past roughly six files, as `auth` has.
+
+### 5.2 Cross-Feature Boundaries
+- Every feature exposes a public surface in its own `index.ts`. Everything else in the folder is internal.
+- Other code imports `@/features/<name>` and never a path inside it. This is enforced by `no-restricted-imports` in `eslint.config.js`, not by review.
+- Inside a feature, siblings are imported relatively (`./authApi`, `../useAuth`), which is what keeps the rule above unambiguous.
+- Feature code may import from `src/components/ui/`, `src/lib/`, and `src/hooks/` freely.
 - When two features share business data, move the shared contract or type to `src/types/` or coordinate through a top-level route.
 
 ---
@@ -130,20 +158,13 @@ frontend/src/
 
 ### 6.1 Monetary Representation
 - The backend stores and transmits all currency amounts as signed 64-bit integer paise (`number` in TypeScript).
-- Never use floating-point numbers for financial calculations in the frontend.
-- When displaying money to the user, always format integer paise using a dedicated helper (`formatPaiseToInr`):
-```typescript
-export function formatPaiseToInr(paise: number): string {
-  const rupees = paise / 100;
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(rupees);
-}
-```
-- When accepting rupee inputs from the user, parse the string to integer paise before sending it in an API payload.
+- All arithmetic on money stays in integer paise. Adding, subtracting, summing a list, comparing: integers only.
+- Division by 100 happens in exactly one place, `formatPaiseToInr` in `src/lib/money.ts`, at the moment of display. Nowhere else.
+- That one division is written with integer operations (`absolute % 100`, then `(absolute - fraction) / 100`) so it is exact rather than merely close enough. Do not simplify it back to `paise / 100`.
+- `formatPaiseToInr` throws on a value that is not an exact integer. A visible failure is better than a rounded amount on screen.
+- Going the other way, `parseInrToPaise` turns user input into integer paise and returns a `ParsedAmount` result rather than throwing, because invalid input is a normal state of a form.
+- More than two decimal places is rejected, never rounded. The user meant something specific and the application does not get to decide what.
+- Both directions are covered by `src/lib/money.test.ts`. A change to either without a test is not finished.
 - Follow the database sign convention: negative paise for outflow (expenses), positive paise for inflow (income).
 
 ### 6.2 Dates and Timestamps
@@ -160,9 +181,10 @@ export function formatPaiseToInr(paise: number): string {
 - Never store session identifiers or authentication tokens in `localStorage` or `sessionStorage`.
 
 ### 7.2 Anti-CSRF Token Handling
-- The backend issues a `XSRF-TOKEN` cookie on login.
+- The backend loads the CSRF token eagerly, so every response carries the `XSRF-TOKEN` cookie, including the 401 from the first `GET /me`.
 - Every state-modifying request (`POST`, `PUT`, `DELETE`, `PATCH`) must read this cookie value and attach it to the `X-XSRF-TOKEN` HTTP header.
 - Safe HTTP methods (`GET`, `HEAD`, `OPTIONS`) must not send the CSRF header.
+- A state-changing call with no cookie to read fails as `CsrfTokenMissingError` before the request is sent. Because the cookie should always be there, its absence is a fault on this side, and failing here says so instead of producing a 403 that looks like a permission problem.
 
 ### 7.3 Error Response Processing
 - The backend reports errors using RFC 7807 Problem Details (`application/problem+json`).
@@ -173,6 +195,11 @@ export function formatPaiseToInr(paise: number): string {
 ### 7.4 Logging and PII
 - Never log passwords, account numbers, or raw bank transaction narration to the browser console.
 - In production builds, all debug logging must be stripped or disabled.
+- `AppErrorBoundary` logs only under `import.meta.env.DEV`, for the same reason.
+
+### 7.5 Cancellation
+- `apiFetch` accepts an `AbortSignal` and passes it to `fetch`.
+- Every query function takes the signal TanStack Query supplies, so a query that is no longer needed stops its request instead of finishing into a discarded result.
 
 ---
 
@@ -184,6 +211,7 @@ export function formatPaiseToInr(paise: number): string {
 cd frontend && npm run build
 ```
 - Type errors will fail the build and must be resolved before committing.
+- `strict` and `noUncheckedIndexedAccess` are both set explicitly in `tsconfig.app.json`. Do not rely on a compiler default for either.
 
 ### 8.2 Linting
 - Verify code style and lint rules:
@@ -191,3 +219,40 @@ cd frontend && npm run build
 cd frontend && npm run lint
 ```
 - Zero ESLint errors and warnings are permitted on commits.
+- The script passes `--max-warnings 0`, so a warning fails the command. Without that flag ESLint exits 0 on warnings and the rule above is unenforceable.
+
+### 8.3 Tests
+- Run the frontend test suite:
+```bash
+cd frontend && npm test
+```
+- Vitest with jsdom, Testing Library for rendering, and MSW for the backend. Tests never mock `fetch` by hand and never mock `apiClient`, so the client's own behaviour is exercised too.
+- A test file sits next to the file it covers, named `<source>.test.ts` or `.test.tsx`.
+- `src/test/` holds the shared harness: `server.ts` and `handlers.ts` for MSW, `renderWithProviders.tsx` for rendering inside the same provider stack `App` uses, and `setup.ts` for the per-run wiring.
+- Query text the way a user finds it: `getByRole` and `getByLabelText`, not a CSS class or a test id.
+- Anything that computes or parses money needs a test. That is the code where a wrong answer is silent.
+- CI runs `npm run lint`, `npm test`, and `npm run build` on every push.
+
+---
+
+## 9. Server State: TanStack Query
+
+### 9.1 Every Backend Read Goes Through a Query
+- Data the backend owns is fetched with `useQuery`, never with `useEffect` plus `useState`.
+- A hand-written fetching effect has no cache, no deduplication, no refetch after a mutation, and no cancellation. Each page that writes its own gets those wrong in its own way.
+- The one exception is `AuthProvider`'s first `GET /me`. The query client is built from that provider's 401 handler, so it does not exist yet when that call runs.
+
+### 9.2 Query Keys
+- Keys live beside the calls they name, as a `const` object in the feature's api file (`accountQueryKeys`).
+- A mutation invalidates by referencing that object, never by retyping the string.
+
+### 9.3 One Client, Built Once
+- `createQueryClient` in `src/lib/queryClient.ts` is the only place query defaults are set.
+- `QueryProvider` creates it once through a lazy `useState` initialiser. Creating it during render would discard the cache on every re-render.
+- A 4xx is never retried; it will fail the same way every time. A 5xx or a dropped connection is retried twice.
+
+### 9.4 Expired Sessions Are Handled Once
+- The query client's `onError` recognises a 401 and calls the auth feature's `handleUnauthorized` (D-41).
+- `ProtectedRoute` turns that state change into a redirect to the login page.
+- A page therefore never handles a 401 itself. It only renders an error for failures that are not the session, which `isUnauthorized` distinguishes.
+- When auth state becomes unauthenticated, `QueryProvider` clears the cache, so no account data is left in memory for whoever logs in next.
