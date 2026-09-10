@@ -14,7 +14,8 @@ Make this update in the same commit or change set as the code change.
 | `README.md` | Quickstart guide and Docker / test commands. |
 | `docker-compose.yml` | Local PostgreSQL 18 service with healthcheck and volume configuration. |
 | `.env.example` | Template for the gitignored `.env`, listing the owner credential and database variables. |
-| `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and frontend build. |
+| `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and the frontend lint, test, and build steps. |
+| `.claude/launch.json` | Dev server registration so the Claude Code browser preview can attach to `npm run dev`. |
 
 ## 2. Plans & Status (`plans/`)
 
@@ -155,17 +156,52 @@ Make this update in the same commit or change set as the code change.
 
 | Path | Purpose |
 | :--- | :--- |
-| `frontend/package.json` | Frontend dependencies and scripts (React 19, TypeScript, Vite 8, Tailwind v4, Shadcn). |
+| `frontend/package.json` | Frontend dependencies and scripts (React 19, TypeScript, Vite 8, Tailwind v4, Shadcn, TanStack Query, Vitest, MSW). `lint` passes `--max-warnings 0` so a warning fails the command. |
 | `frontend/components.json` | Shadcn UI CLI configuration (Tailwind v4, Base UI, Geist font, Nova preset). |
-| `frontend/vite.config.ts` | Vite configuration with React plugin, Tailwind v4 plugin, and `@` path alias. |
+| `frontend/vite.config.ts` | Vite configuration with React plugin, Tailwind v4 plugin, `@` path alias, the dev proxy from `/api` to the backend (D-39), and the Vitest jsdom setup. |
 | `frontend/tsconfig.json` | Root TypeScript project references and path alias mapping. |
-| `frontend/tsconfig.app.json` | Frontend application TypeScript compiler options with `@/*` path mapping. |
-| `frontend/eslint.config.js` | ESLint configuration for React 19, TypeScript, and Shadcn component variants. |
+| `frontend/tsconfig.app.json` | Frontend application TypeScript compiler options with `@/*` path mapping, and `strict` plus `noUncheckedIndexedAccess` set explicitly rather than left to the compiler default. |
+| `frontend/eslint.config.js` | ESLint configuration for React 19, TypeScript, and Shadcn component variants, plus the `no-restricted-imports` rule that enforces the feature public-surface boundary. |
 | `frontend/src/main.tsx` | React application root entry point. |
-| `frontend/src/App.tsx` | Main application shell displaying dummy Shadcn components and Tailwind v4 layout. |
+| `frontend/src/App.tsx` | Route table: `/login`, the protected `/accounts` under `AppLayout`, and a catch-all redirect. |
 | `frontend/src/index.css` | Global stylesheet importing Tailwind CSS v4, font variables, and Shadcn semantic theme tokens. |
 | `frontend/src/lib/utils.ts` | Shared frontend utility functions, including the `cn()` class name merger. |
+| `frontend/src/lib/routes.ts` | Every path the router knows, as one `ROUTES` constant, so a rename is a single edit. |
+| `frontend/src/lib/money.ts` | `formatPaiseToInr` and `parseInrToPaise`: the only place integer paise is turned into rupees or back. |
+| `frontend/src/lib/apiClient.ts` | The one fetch wrapper every feature calls through: same-origin credentials, the CSRF header on state-changing methods, an `AbortSignal` pass-through, and every non-2xx response turned into an `ApiError` carrying the RFC 7807 body. |
+| `frontend/src/lib/queryClient.ts` | Builds the single TanStack Query client: retry policy, stale time, and the one place a 401 becomes a call to the auth feature's `handleUnauthorized`. |
+| `frontend/src/components/QueryProvider.tsx` | Creates the query client once under `AuthProvider`, and clears the cache when the session ends. |
+| `frontend/src/components/AppErrorBoundary.tsx` | The one class component: catches a render throw so a bug shows a message instead of a blank page. |
 | `frontend/src/components/ui/button.tsx` | Shadcn Button component supporting variants (default, secondary, outline, destructive) and sizes. |
 | `frontend/src/components/ui/card.tsx` | Shadcn Card component suite (Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter). |
 | `frontend/src/components/ui/badge.tsx` | Shadcn Badge component supporting semantic status variants. |
 | `frontend/src/components/ui/input.tsx` | Shadcn Input component for styled text inputs. |
+| `frontend/src/components/ui/label.tsx` | Shadcn Label component for accessible form field labels. |
+| `frontend/src/components/ui/field.tsx` | Shadcn Field composition (Field, FieldGroup, FieldLabel, FieldDescription, FieldError, and related layout primitives) for form layout. |
+| `frontend/src/components/ui/alert.tsx` | Shadcn Alert component suite for callouts, including login and load-failure error messages. |
+| `frontend/src/components/ui/spinner.tsx` | Shadcn Spinner component used inside disabled buttons and page-level loading states. |
+| `frontend/src/components/ui/separator.tsx` | Shadcn Separator component (a Field composition dependency). |
+| `frontend/src/components/layout/AppHeader.tsx` | Header shown on authenticated pages: app name, the logged-in user's display name, and the logout button. |
+| `frontend/src/components/layout/AppLayout.tsx` | Wraps `AppHeader` and an `Outlet` for every route nested under `ProtectedRoute`. |
+| `frontend/src/features/auth/index.ts` | The auth feature's public surface, and the only path other code may import from it. |
+| `frontend/src/features/auth/types.ts` | The `UserProfile` type returned by login and `GET /api/v1/me`. |
+| `frontend/src/features/auth/authApi.ts` | `login`, `logout`, and `getMe` calls through `apiClient`. |
+| `frontend/src/features/auth/authContext.ts` | The `AuthContext` object and its value type only; no component, so it cannot break React Fast Refresh. |
+| `frontend/src/features/auth/useAuth.ts` | The `useAuth()` hook other features and layout components call to read auth state. |
+| `frontend/src/features/auth/components/AuthProvider.tsx` | Calls `GET /api/v1/me` once on mount and holds `status` (`loading` / `authenticated` / `unauthenticated`) and the current `UserProfile`; exposes `login`, `logout`, and `handleUnauthorized` (D-41). |
+| `frontend/src/features/auth/components/LoginForm.tsx` | Email and password fields, one uniform error message on failure, and a disabled-plus-spinner submit state. |
+| `frontend/src/features/auth/components/LoginForm.test.tsx` | Drives the form against MSW: labelled fields, the posted body, the uniform failure message, and the non-API fallback message. |
+| `frontend/src/features/auth/components/ProtectedRoute.tsx` | Route guard: redirects to `/login` while unauthenticated, otherwise renders its nested routes. |
+| `frontend/src/features/auth/pages/LoginPage.tsx` | The `/login` route: redirects to `/accounts` if already authenticated, otherwise renders `LoginForm` in a Card. |
+| `frontend/src/features/accounts/index.ts` | The accounts feature's public surface. |
+| `frontend/src/features/accounts/types.ts` | The `AccountResponse` type and the `AccountType` union (`ASSET`, `LIABILITY`, `VIRTUAL`) mirroring the backend DTO. |
+| `frontend/src/features/accounts/accountsApi.ts` | The `listAccounts` call and the `accountQueryKeys` that name its cache entry. |
+| `frontend/src/features/accounts/AccountList.tsx` | Renders the caller's accounts as Cards with a type badge and an active/inactive badge. |
+| `frontend/src/features/accounts/AccountsPage.tsx` | The `/accounts` route: one `useQuery`, an empty state, and an error alert for failures that are not the session. |
+| `frontend/src/features/accounts/AccountsPage.test.tsx` | The list, the empty state, the error alert, and the whole expired-session chain through the real route guard. |
+| `frontend/src/lib/money.test.ts` | Formatting and parsing of integer paise, including exactness at the safe-integer limit and rejection of a third decimal place. |
+| `frontend/src/lib/apiClient.test.ts` | The CSRF header rules, the problem-detail mapping, the 204 case, and the abort signal. |
+| `frontend/src/test/setup.ts` | Per-run test wiring: jest-dom matchers, the MSW lifecycle, the CSRF cookie, and a relative-URL shim for Node's fetch. |
+| `frontend/src/test/server.ts` | The MSW node server every test shares. |
+| `frontend/src/test/handlers.ts` | Default backend responses and the RFC 7807 problem builder tests override with. |
+| `frontend/src/test/renderWithProviders.tsx` | Renders a component inside the same provider stack `App` uses, in the same order. |
