@@ -20,6 +20,10 @@
     },
 
     /* Linting */
+    // Set explicitly rather than relying on the compiler default, so a TypeScript downgrade cannot silently turn null checking off.
+    "strict": true,
+    // Reading past the end of an array yields `undefined`, and this makes the compiler say so. A ledger UI indexes lists constantly.
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
