@@ -2,7 +2,7 @@
 -- This file is public (DM-16 keeps seed data out of V1), so the email below is a placeholder, not the owner's real address (SECURITY.md §2) — FR-8 replaces it with a real credential later.
 
 INSERT INTO app.users (email, display_name)
-VALUES ('owner@financetracker.local', 'Owner');
+VALUES ('owner@ft.local', 'Owner');
 
 INSERT INTO app.accounts (user_id, name, type, dedup_method)
 SELECT u.id, v.name, v.type, v.dedup_method
@@ -13,7 +13,7 @@ CROSS JOIN (VALUES
     ('HDFC Millenia', 'LIABILITY', 'STATEMENT_BATCH'),
     ('Investments', 'VIRTUAL', 'NONE')
 ) AS v (name, type, dedup_method)
-WHERE u.email = 'owner@financetracker.local';
+WHERE u.email = 'owner@ft.local';
 
 INSERT INTO app.categories (user_id, name, kind)
 SELECT u.id, v.name, v.kind
@@ -43,4 +43,4 @@ CROSS JOIN (VALUES
     ('Freelance', 'INCOME'),
     ('Other Income', 'INCOME')
 ) AS v (name, kind)
-WHERE u.email = 'owner@financetracker.local';
+WHERE u.email = 'owner@ft.local';

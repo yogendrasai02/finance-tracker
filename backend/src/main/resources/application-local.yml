@@ -28,7 +28,7 @@ ft:
     # The seeded owner's credential, set on startup because a migration must never carry a hash (SECURITY.md SR-40).
     # The password is empty by default, so a fresh clone starts and simply cannot log in, rather than refusing to boot.
     # See .env.example.
-    email: ${FT_OWNER_EMAIL:owner@financetracker.local}
+    email: ${FT_OWNER_EMAIL:owner@ft.local}
     password: ${FT_OWNER_PASSWORD:}
 
 management:

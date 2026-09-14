@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 class TenantTransactionTest {
 
-    private static final String SEEDED_EMAIL = "owner@financetracker.local";
+    private static final String SEEDED_EMAIL = "owner@ft.local";
 
     private static long ownerId;
 

@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /** Proves the credential columns hold their rules and that app.find_login_identity is a narrow, working exception to tenant isolation (D-35, SR-40). */
 class AuthSchemaTest extends SchemaTestBase {
 
-    private static final String SEEDED_EMAIL = "owner@financetracker.local";
+    private static final String SEEDED_EMAIL = "owner@ft.local";
     private static final String CHECK_VIOLATION = "23514";
 
     @Test
