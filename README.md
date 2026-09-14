@@ -65,3 +65,17 @@ Created once by `db/init/01-roles-and-schema.sh`, on first container start again
 - `ft_app` — DML only, what the app connects as.
 
 A change under `db/init` needs `docker compose down -v` to take effect.
+
+## Production
+
+Activate the profile with `SPRING_PROFILES_ACTIVE=prod`.
+Every value `application-prod.yml` needs comes from the environment, with no default — see the production section of `.env.example`.
+
+`ProductionEnvironmentGuard` checks the following before anything tries to open a database connection, and refuses to start otherwise:
+
+- `DB_URL` includes `sslmode=verify-full` (SECURITY.md SR-36).
+- `FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD` are both set (SR-35, SR-40).
+
+Actuator exposes `health` only, with `show-details: never`, so a public health check reveals nothing about the database or the disk.
+
+CORS, static-asset serving, and the dependency CVE build gate are still open — see `plans/STATUS.md`.

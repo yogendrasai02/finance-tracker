@@ -4,12 +4,14 @@ spring:
   datasource:
     # ft_app: read/write on the app schema only (SECURITY.md SR-48).
     # Every value comes from the environment; nothing is defaulted here, unlike application-local.yml.
+    # DB_URL must include sslmode=verify-full (SECURITY.md SR-36): ProductionEnvironmentGuard refuses to start otherwise, before any connection is attempted.
     url: ${DB_URL}
     username: ${DB_APP_USERNAME}
     password: ${DB_APP_PASSWORD}
   flyway:
     # ft_migrator: owns the schema, runs DDL.
     # Kept separate from the application's own credentials above (DM-28).
+    # Flyway has no url of its own configured, so it reuses spring.datasource.url above, sslmode included.
     user: ${DB_MIGRATOR_USERNAME}
     password: ${DB_MIGRATOR_PASSWORD}
     schemas: app,auth
@@ -25,3 +27,14 @@ ft:
     # A deployment missing either variable fails to start, instead of running with an account nobody can log into (SECURITY.md SR-35, SR-40).
     email: ${FT_OWNER_EMAIL}
     password: ${FT_OWNER_PASSWORD}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Explicit rather than relying on Boot's own default, since that default is what a security-sensitive setting should never depend on silently (SECURITY.md SR-75).
+        include: health
+  endpoint:
+    health:
+      # The opposite of application-local.yml's "always": a public health check must not reveal database or disk state.
+      show-details: never
