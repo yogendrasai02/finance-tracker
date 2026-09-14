@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   server: {
+    port: 3000,
     proxy: {
       // The browser sees one origin, so the session and CSRF cookies are same-site with no CORS configuration needed (D-39).
       '/api': {
