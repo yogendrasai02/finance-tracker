@@ -1,88 +1,67 @@
 # README
 
-## Running backend tests
+## Local setup
 
-`./mvnw verify` in `backend/` needs Docker running, and nothing else.
-The schema tests start their own throwaway `postgres:18-alpine` container via Testcontainers, apply the four Flyway migrations, and tear it down at the end of the run.
-A hand-started container from `docker compose up` is not required and is not used — the tests open their own connections to their own container.
+1. Docker running.
+2. `docker compose up -d` — starts Postgres 18 on `localhost:5432`. First run also fires `db/init/01-roles-and-schema.sh`, creating schemas `app`/`auth` and roles `ft_migrator`/`ft_app`.
+3. Copy `.env.example` to `.env`. Set `FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD` (12+ chars).
+4. Export `.env` into your shell — Spring Boot doesn't read it, only Docker Compose does. Run this command from the root directory:
+   ```
+   set -a && source .env && set +a
+   ```
+5. `cd backend && ./mvnw spring-boot:run` — runs the Flyway migrations, sets the owner's password (first run only), starts on `localhost:8080`.
+6. `cd frontend && npm install && npm run dev` — Vite on `localhost:3000`, proxies `/api/**` to `:8080`.
 
-## Sample docker commands
+## Seeded user
 
-In reference to `docker-componse.yml`
+`V4__seed_data.sql` seeds one row in `app.users`: `owner@ft.local`, no password. Migrations can't ship a password hash (SR-40).
+
+The password is set once — the first time the backend starts against a row with no password, using whatever `FT_OWNER_PASSWORD` is in the environment at that moment. After that, `.env` changes do nothing: the bootstrap never overwrites an existing hash, and login checks the email in the database, not `FT_OWNER_EMAIL`.
+
+**Reset the password** (forgot it, or want a new one):
+```sql
+UPDATE app.users SET password_hash = NULL WHERE email = 'owner@ft.local';
+```
+Restart the backend to re-run the bootstrap.
+
+**Change the login email** (no self-service endpoint yet):
+```sql
+UPDATE app.users SET email = 'new@email.com' WHERE email = 'owner@ft.local';
+```
+
+Run either as `ft_migrator` or the superuser — `ft_app` can't see the row, RLS blocks it.
+
+## Database access (DBeaver)
+
+Host `localhost`, port `5432`, database `financetracker`, driver PostgreSQL.
+
+| Role | Password (default) | Sees |
+| --- | --- | --- |
+| `financetracker` | `financetracker_dev` | Everything (superuser). |
+| `ft_migrator` | `ft_migrator_dev` | Everything (schema owner, bypasses RLS). |
+| `ft_app` | `ft_app_dev` | Nothing by default — RLS blocks it until `app.user_id` is set in the session. |
+
+Use `financetracker` or `ft_migrator` to browse data. Defaults come from `docker-compose.yml`; check `.env` for overrides.
+
+## Backend tests
+
+`./mvnw verify` in `backend/` — needs Docker, nothing else. Spins up its own throwaway Postgres via Testcontainers, runs every migration, tears it down. Doesn't touch the `docker compose` container.
+
+## Docker cheatsheet
 
 ```
-docker compose ps          # list containers this compose file manages, with status
-docker compose up -d       # start the container(s) defined here, detached (background) -> creates the network, starts the container
-docker compose logs -f     # follow Postgres's own log output
-docker compose down        # stop and remove the container; volume survives
+docker compose ps          # container status
+docker compose up -d       # start, detached
+docker compose logs -f     # follow Postgres logs
+docker compose down        # stop; volume survives
+docker compose down -v     # stop and wipe the volume (!!WARNING!!)
 ```
 
 ## Database roles
 
-`db/init/01-roles-and-schema.sh` creates two Postgres roles on first container start:
-`ft_migrator` (owns the `app` schema, runs Flyway migrations) and `ft_app` (DML only — what the
-application connects as). It only runs once, against an empty data directory, so a change under
-`db/init` needs `docker compose down -v` before it takes effect again.
+Created once by `db/init/01-roles-and-schema.sh`, on first container start against an empty data directory:
 
-## Working with the app locally
+- `ft_migrator` — owns the `app` schema, runs Flyway migrations.
+- `ft_app` — DML only, what the app connects as.
 
-### Docker: Postgres 18 in a container
-
-Docker must be running.
-
-Set values in `.env` file, it needs two values: `FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD` (atleast 12 chars). Without these, the app boots BUT no one can login since the seeded user has no password.
-
-Run this command to start Postgres 18 in a container: `docker compose up -d`
-
-On the first ever start, `db/init/01-roles-and-schema.sh` is run and it creates the `app`, `auth` schemas as well as the 2 DB roles:  `ft_migrator`, `ft_app`
-
-**Note:** Postgres runs at `localhost:5173`
-
-### Running backend
-
-`.env` is only auto-read by Docker Compose, for the Postgres container. Spring Boot does not read it.
-
-`FT_OWNER_EMAIL` and `FT_OWNER_PASSWORD` must be valid environment variables in the shell that runs `./mvnw`, or the app starts with a warning and nobody can log in.
-Export them first (not from the `backend` directory, these needs to be run from the root):
-
-```
-set -a
-source .env
-set +a
-```
-
-Or as a single command: `set -a && source .env && set +a`
-
-Then, `cd` onto `backend` directory, and run `./mvnw spring-boot:run` which does 3 main things:
-
-1. runs the flyway migrations as `ft_migrator` to build the db schema
-2. sets the owner's password from the environment, the first time it runs
-3. starts spring boot app at `http://localhost:8080`
-
-Verify these logs for #1:
-```
-2026-09-14T15:44:24.552+05:30  INFO 28995 --- [backend-local] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/financetracker?currentSchema=app (PostgreSQL 18.6)
-2026-09-14T15:44:24.592+05:30  INFO 28995 --- [backend-local] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 6 migrations (execution time 00:00.015s)
-2026-09-14T15:44:24.615+05:30  INFO 28995 --- [backend-local] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "app": 6
-2026-09-14T15:44:24.616+05:30  INFO 28995 --- [backend-local] [           main] o.f.core.internal.command.DbMigrate      : Schema "app" is up to date. No migration necessary.
-```
-
-Verify these logs for #2: `c.f.auth.OwnerCredentialBootstrap        : Owner credential already present, leaving it unchanged`
-
-### Running the frontend
-
-`cd` onto `frontend` directory, run `npm install` to keep the deps upto (and for the first time as well).
-
-Then run `npm run dev` which starts Vite at `http://localhost:3000`
-
-Any request to `/api/**` is proxied to the backend at port 8080.
-
-### Accessing the database
-
-To use DBeaver, use the below config:
-
-- Host: `localhost`
-- Port: `5432`
-- Database: `financetracker`
-- Driver: PostgreSQL
-- Username & Password auth: `finanacetracker` is the username, `financetracker_dev` is the password (see 01-roles-and-schema.sh file)
+A change under `db/init` needs `docker compose down -v` to take effect.
