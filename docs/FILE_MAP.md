@@ -15,6 +15,7 @@ Make this update in the same commit or change set as the code change.
 | `docker-compose.yml` | Local PostgreSQL 18 service with healthcheck and volume configuration. |
 | `.env.example` | Template for the gitignored `.env`, listing the owner credential and database variables. |
 | `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and the frontend lint, test, and build steps. |
+| `.github/dependabot.yml` | Weekly dependency updates for Maven, npm, and GitHub Actions; version-update PRs paused until production, security alerts (SR-19) unaffected. |
 | `.claude/launch.json` | Dev server registration so the Claude Code browser preview can attach to `npm run dev`. |
 
 ## 2. Plans & Status (`plans/`)

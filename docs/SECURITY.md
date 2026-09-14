@@ -28,7 +28,7 @@ This table classifies everything the MVP stores or will store.
 | **Confidential — owner identity** | Email, display name | `users` | Never logged except as opaque user id, encrypted at rest |
 | **Confidential — interpretation data** | Categories, needs/wants, notes, rule patterns, link structure | `categories`, `category_rules`, `transactions` interpretation columns, `transaction_links` | Notes and rule patterns may contain anything the owner typed — treat like narrations. Never logged verbatim |
 | **Confidential — upload metadata** | Source filename | `statement_imports.source_filename` | Banks put identifying details in filenames; never logged, sanitized on write (SR-33) |
-| **Secret — credentials** | Future login credentials (FR-8), session identifiers, DB credentials, any API keys | Secret store / env (never the repo); credential columns when FR-8 is designed | Never logged, never in the repo, never in URLs, hashed (passwords) or encrypted, excluded from backups where possible |
+| **Secret — credentials** | Login password hashes (FR-8), session identifiers, DB credentials, any API keys | Secret store / env (never the repo); `users.password_hash` and `auth.spring_session` | Never logged, never in the repo, never in URLs, hashed (passwords) or encrypted, excluded from backups where possible |
 | **Internal — operational data** | Numeric row ids, statuses, enum values, row counts, `fingerprint_version`, timestamps, SQLSTATE and constraint names | Everywhere | May be logged |
 
 Two deliberate consequences:
@@ -44,11 +44,12 @@ MVP has one user, so nothing would leak today — but the closed-circle phase in
 Isolation must therefore be structural from the first line of code, not retrofitted.
 
 - **SR-01.** Every read and write of a user-owned table is scoped by the authenticated user's id, taken from the server-side session — never from a request parameter, header, or body.
-- **SR-02.** Tenant scoping is enforced by structure, not by per-query habit:
-  every repository method for a user-owned entity either takes `userId` as a mandatory parameter or inherits it from a tenant-scoped base.
-  An architecture test (e.g. ArchUnit) fails the build if a repository for a user-owned entity exposes a finder without tenant scope.
-- **SR-03.** PostgreSQL Row-Level Security is enabled on every domain table as the database-level backstop, with the app setting the tenant id per transaction (`SET LOCAL`).
-  This is proposed as DM-30 (see the review) because it matches the project's existing rule that invariants live in the database (DM-02, D-20): an unscoped query then returns zero foreign rows even when the Java code is wrong.
+  `TenantContextFilter` copies the id out of the `Authentication` into `CurrentTenantContext` for the length of one request; nothing else sets it (step 4c, 4e).
+- **SR-02.** Tenant scoping is enforced by structure, not by per-query habit.
+  This application scopes differently from the parameter-per-finder design first written here: `TenantAwareJpaTransactionManager` applies `set_config('app.user_id', ...)` to every transaction before any query runs, so no repository method has to remember to filter (D-38, DATA_MODEL.md §2.3).
+  An architecture test (ArchUnit) fails the build if any code opens a database connection outside that transaction manager, or if a second `PlatformTransactionManager` is introduced that would bypass it — see `ArchitectureTest` (step 4c).
+- **SR-03.** PostgreSQL Row-Level Security is enabled on every domain table as the database-level backstop (DM-30), with the app setting the tenant id per transaction via `TenantAwareJpaTransactionManager` (`set_config('app.user_id', ..., true)`, step 4c).
+  This matches the project's existing rule that invariants live in the database (DM-02, D-20): an unscoped query then returns zero foreign rows even when the Java code is wrong.
 - **SR-04.** Resource-id endpoints (`/transactions/{id}`, `/imports/{id}`, `/rules/{id}`, …) return **404** for a row that exists but belongs to another user — the same response as for a row that does not exist.
   403 confirms the id exists and enables enumeration.
 - **SR-05.** Multi-row operations validate every referenced id:
@@ -60,6 +61,8 @@ Isolation must therefore be structural from the first line of code, not retrofit
 - **SR-07. IDOR test suite.** Integration tests seed two users with data and, for **every** endpoint, call it as user B with user A's resource ids, asserting 404/empty.
   The test enumerates endpoints from the route table so a new endpoint cannot ship untested.
   This suite is written in MVP, while there is still only one real user.
+  Delivered in step 4i: `TwoUserTestHarness` seeds the two users, and `EndpointSecurityTest` sweeps every route in every `RequestMappingInfoHandlerMapping` for the 401 half of this rule.
+  The 404-for-another-user's-id half is proved by a worked case against a test-only endpoint, since no real id-taking endpoint exists yet; each real one gets its own case as it ships.
 
 ## 4. Upload and parser safety (FR-2)
 
@@ -134,20 +137,30 @@ These are the rules that make that testable.
 
 ## 6. Authentication and session (constraints on FR-8)
 
-The mechanism is deliberately unchosen (FR-8, DM-14).
-These are the constraints any chosen mechanism must satisfy — proposed as D-31.
+The mechanism is chosen and delivered, in step 4 (FR-8, D-33 through D-42): server-side sessions in a cookie, via Spring Security, stored in Postgres.
+These are the constraints it satisfies — decided as D-31.
+Two are only partly closed, and that is stated plainly rather than glossed over.
 
 - **SR-35.** Every endpoint except login and static assets requires authentication.
   There is no "localhost trust", no unauthenticated dev profile reachable in a deployed build, and no default credentials.
+  `SecurityConfiguration`'s filter chain is deny-by-default: `anyRequest().authenticated()` runs last, and `EndpointSecurityTest` (4i) sweeps every route in the application's routing tables to prove it.
+  `ProductionEnvironmentGuard` (4k) additionally refuses to start the `prod` profile with no owner credential configured, rather than starting with an account nobody can log into.
 - **SR-36.** TLS everywhere: browser→app is HTTPS only (HSTS on), app→DB uses TLS with certificate verification (`sslmode=verify-full` or the JDBC equivalent).
-- **SR-37.** The session lives in an `HttpOnly`, `Secure`, `SameSite` cookie — never in `localStorage` or `sessionStorage`.
+  **App→DB is closed:** `ProductionEnvironmentGuard` (4k) refuses to start the `prod` profile unless `DB_URL` includes `sslmode=verify-full`, and it runs before any connection — including Flyway's — is attempted.
+  **Browser→app HTTPS/HSTS is still open:** HSTS is set on every response (`SecurityConfiguration`), but TLS termination itself is the hosting platform's job and nothing terminates it yet, since there is no deployment target chosen.
+- **SR-37.** The session lives in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie — never in `localStorage` or `sessionStorage`.
   Reason: a single XSS bug can read browser storage; it cannot read an `HttpOnly` cookie.
-  Consequence: state-changing endpoints need CSRF protection (token or `SameSite=Strict` plus origin checks — decided with the mechanism).
+  Consequence: state-changing endpoints need CSRF protection, delivered as a `CookieCsrfTokenRepository` plus `SameSite=Strict` (`SecurityConfiguration`, step 4e; D-39).
 - **SR-38.** Sessions expire: an idle timeout and an absolute lifetime, both server-enforced; logout invalidates server-side.
+  Idle timeout 30 minutes (Spring Session JDBC), absolute lifetime 12 hours (`AbsoluteSessionTimeoutFilter`), both against `auth.spring_session` in Postgres so a restart does not silently extend either one (step 4f; D-34).
 - **SR-39.** Login is rate-limited and failures are uniform ("invalid credentials" — never "no such user").
+  `LoginRateLimitFilter` plus `LoginRateLimiter` (Bucket4j, 5/minute and 20/hour per client-IP-and-email key) reject over-limit attempts before a password comparison runs; `DaoAuthenticationProvider`'s own dummy-hash comparison keeps a wrong email and a wrong password the same shape and roughly the same time (step 4e, 4g; D-40).
 - **SR-40.** If passwords are the chosen factor: hashed with Argon2id or bcrypt (per current OWASP guidance at implementation time), never logged, never in the repo — including the seeded user's hash.
   The seed user's credential is bootstrapped from the environment or set on first run, not written into a Flyway migration.
+  Delivered as `DelegatingPasswordEncoder` with Argon2id default (D-37) and `OwnerCredentialBootstrap`, which sets the hash only when the account has none (step 4d; D-36); `ProductionEnvironmentGuard` (4k) refuses to start `prod` if `FT_OWNER_EMAIL` or `FT_OWNER_PASSWORD` resolves blank, which an unset-but-defined environment variable can do without tripping Spring's own placeholder-resolution failure.
 - **SR-41.** CORS allows exactly the app's own origin(s); no wildcard with credentials.
+  **Still open.** Nothing is configured, which means no CORS headers at all — the safe default — and the development frontend reaches the API through a same-origin Vite proxy instead (D-39), so nothing in normal use depends on this yet.
+  The explicit origin allowlist is written once a real frontend origin exists to allow (`plans/STATUS.md`).
 
 ## 7. Secrets management
 
@@ -245,8 +258,8 @@ This table is the shopping list.
 
 | Required | Example | Purpose | Requirement |
 | -------- | ------- | ------- | ----------- |
-| IDOR suite | Spring Boot integration tests, two seeded users | Calls every endpoint as user B with user A's ids and asserts 404. Enumerated from the route table so a new endpoint cannot ship untested | SR-07 |
-| Architecture test | ArchUnit | Fails the build if a repository for a user-owned entity exposes a finder without tenant scope. This is what makes scoping structural instead of a habit | SR-02 |
+| IDOR suite | Spring Boot integration tests, two seeded users | Calls every endpoint as user B with user A's ids and asserts 404. Enumerated from the route table so a new endpoint cannot ship untested. Delivered as `TwoUserTestHarness` and `EndpointSecurityTest` (step 4i) | SR-07 |
+| Architecture test | ArchUnit | Fails the build if a query runs on a connection taken outside `TenantAwareJpaTransactionManager`, or if a second transaction manager is introduced. This is what makes scoping structural instead of a habit — see `ArchitectureTest` (step 4c) for why the mechanism differs from a `userId`-parameter-per-finder design | SR-02 |
 | Log-capture test | Logback list appender, `OutputCaptureExtension` | Runs the sensitive flows and asserts no fixture narration, amount, balance, or account number appears in captured output. Runs under the production profile | SR-29 |
 | Parser hostile-input tests | Crafted XXE, zip bomb, `.xlsm`, oversize and over-cap fixtures | Proves each limit rejects. POI's defaults are verified, never assumed | SR-11…SR-15 |
 | Header-block exclusion test | Real-shaped masked fixture | Asserts the account number and customer ID appear nowhere in the database after an import | SR-20 |
@@ -261,20 +274,21 @@ This table is the shopping list.
 | Global error handler | `@ControllerAdvice`, Spring error attributes disabled | No stack trace, SQL fragment, constraint name, or trigger text reaches a client | SR-75 |
 | Structured logging with a field whitelist | Logback JSON encoder, safe entity `toString()` | Only Internal-class fields are loggable; an accidental entity log leaks nothing | SR-26, SR-27 |
 | Profile-bound redaction, safe by default | Spring profiles + startup assertion | Postgres `DETAIL` allowed in development, refused in production, with the safe behaviour as the default | SR-28 |
-| Rate limiter | Bucket4j, or gateway rules | Login (credential stuffing) and import (the most expensive endpoint) | SR-18, SR-39 |
-| Session cookie configuration | Spring Security | `HttpOnly`, `Secure`, `SameSite`; never browser storage | SR-37 |
-| CSRF protection and strict CORS | Spring Security | State-changing requests protected; exactly the app's own origin allowed | SR-37, SR-41 |
+| Rate limiter | Bucket4j, or gateway rules | Login (credential stuffing, delivered step 4g) and import (the most expensive endpoint, not built yet) | SR-18, SR-39 |
+| Session cookie configuration | Spring Security | `HttpOnly`, `Secure`, `SameSite`; never browser storage. Delivered (step 4e) | SR-37 |
+| CSRF protection | Spring Security, `CookieCsrfTokenRepository` | State-changing requests protected. Delivered (step 4e) | SR-37 |
+| Strict CORS | Spring Security | Exactly the app's own origin allowed. **Still open** — nothing is configured yet, which is the safe default; the explicit allowlist waits for a real frontend origin (`plans/STATUS.md`) | SR-41 |
 | Multipart limits | `max-file-size`, `file-size-threshold` above the cap, private `location` | Enforces SR-10 and keeps the statement out of the filesystem | SR-10, SR-17 |
 
 ### Platform and database
 
 | Required | Example | Purpose | Requirement |
 | -------- | ------- | ------- | ----------- |
-| TLS on both hops | HTTPS with HSTS; JDBC `sslmode=verify-full` | Restricted data in transit, including app→DB | SR-36 |
+| TLS on both hops | HTTPS with HSTS; JDBC `sslmode=verify-full` | Restricted data in transit, including app→DB. App→DB is enforced at startup by `ProductionEnvironmentGuard` (step 4k); browser→app HTTPS termination is still the hosting platform's job, not yet configured anywhere | SR-36 |
 | Verified at-rest encryption | Provider console or API check | Must demonstrably cover `raw_cells`, the most sensitive store in the system | SR-51 |
 | Encrypted backups with a tested restore | Provider snapshots | Backups carry the same data and the same duty. An untested restore is not a backup | SR-52 |
-| Least-privilege database roles | App role: DML only, no DDL, no trigger control, no `BYPASSRLS`. Separate Flyway role | Without this, DM-02's triggers and RLS can be switched off by the app's own connection. The database half — what `ft_app` cannot do — is covered by `RolePrivilegeTest` (step 3); the application's own connection is not built yet | SR-48 |
-| Row-Level Security | Postgres RLS + per-transaction `SET LOCAL` | Database backstop for tenant scoping: an unscoped query returns zero foreign rows. The database half is covered by `RowLevelSecurityTest` and `RlsCoverageTest` (step 3); wiring `SET LOCAL app.user_id` into the application's real transactions is step 4 | SR-03 |
+| Least-privilege database roles | App role: DML only, no DDL, no trigger control, no `BYPASSRLS`. Separate Flyway role | Without this, DM-02's triggers and RLS can be switched off by the app's own connection. The database half — what `ft_app` cannot do — is covered by `RolePrivilegeTest` (step 3); the application's own `ft_app` connection is built and running since step 4 | SR-48 |
+| Row-Level Security | Postgres RLS + per-transaction `SET LOCAL` | Database backstop for tenant scoping: an unscoped query returns zero foreign rows. The database half is covered by `RowLevelSecurityTest` and `RlsCoverageTest` (step 3); `TenantAwareJpaTransactionManager` wires `SET LOCAL app.user_id` into every real transaction (step 4c) | SR-03 |
 | Secret store | Environment injection or a cloud secret manager | No secret in the repo, an image, or a migration | SR-45 |
 
 ### Before the closed-circle phase (not MVP)

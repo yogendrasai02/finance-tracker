@@ -95,6 +95,10 @@ If the application connects as the schema owner, the argument is void and the tr
 The role split is what makes the claim hold.
 See [SECURITY.md](SECURITY.md) SR-48.
 
+**A second schema, `auth`, holds session storage (DM-41).**
+Both roles have the same rights there as in `app`: `ft_migrator` owns it, `ft_app` gets `USAGE` plus DML.
+Nothing in `auth` carries Row-Level Security, and nothing in it is a domain table — it exists so a session, which is what establishes the tenant, never has to be tenant-scoped itself.
+
 ## 3. Entity relationship diagram
 
 ```mermaid
@@ -125,6 +129,9 @@ Eleven tables in five groups:
 | Import | `statement_imports`, `statement_import_rows` | FR-2 |
 | Links between rows | `transaction_links`, `transaction_link_members`, `dismissed_matches` | FR-4, and §2.7 in v1.1 |
 | Meaning and checking | `categories`, `category_rules`, `balance_checkpoints` | FR-5, FR-6, FR-7 |
+
+These eleven live in schema `app`.
+A twelfth and thirteenth table, `auth.spring_session` and `auth.spring_session_attributes`, hold Spring Session JDBC's own session rows in the separate `auth` schema (§2.4, DM-41) — framework-owned, not part of this ERD, and outside every convention this document states for the eleven above.
 
 ## 4. Identity and accounts
 
@@ -736,3 +743,4 @@ Where it needed a table or a column, nothing is built.
 | DM-38 | Conventions that must hold for every table — money as integer paise, `TIMESTAMPTZ` timestamps, every domain table carrying `user_id`, every parent carrying `UNIQUE (user_id, id)`, every domain table having Row-Level Security — are asserted by reading `information_schema` and `pg_catalog` and deriving the table list from the database itself, not by testing one table as a stand-in for the rest | A test against one table proves nothing about a table a later migration adds. A migration that breaks a convention then fails on its first run, with nobody having to remember to write a test for the new table |
 | DM-39 | `V5` adds `password_hash`, `password_updated_at`, `last_login_at` and `status` to `app.users`. There is no `password_algorithm` column, `password_hash` must match `{%}%`, and `email` must equal `lower(email)` | The encoder writes its own `{algorithm}` prefix, so the algorithm belongs with the value and can differ per row while it is being changed. The hash-format check makes storing a raw password impossible rather than merely wrong. Login matches the email exactly, so a mixed-case row would be unreachable, which is the kind of defect that looks like a forgotten password |
 | DM-40 | Login reads the user row through `app.find_login_identity(email)`: `SECURITY DEFINER`, owned by `ft_migrator`, fixed `search_path`, `EXECUTE` revoked from `PUBLIC` and granted to `ft_app`, returning `id`, `password_hash` and `status` only | The RLS policy on `app.users` compares `id` against `app.user_id`, but login has to find the row before any id exists (DM-30). The alternatives were weakening that policy or adding a third `BYPASSRLS` role; both are permanently wider than one narrow function. It works because the table owner skips its own policies (DM-32), so `app.users` must never gain `FORCE ROW LEVEL SECURITY` — a test asserts this, because the failure would be login finding no user with no error anywhere |
+| DM-41 | `V6` creates Spring Session JDBC's own tables, `auth.spring_session` and `auth.spring_session_attributes`, copied from the Spring Session release's own `schema-postgresql.sql` rather than hand-written. They carry no Row-Level Security | A session is what establishes the tenant, so a tenant-scoped session table would be circular (D-34). Putting it in a schema outside `app` keeps "every table in `app` is tenant-owned, RLS included" true for every table `RlsCoverageTest` and `SchemaConventionsTest` actually check, instead of making the session table the first hand-carved exception to that convention |
