@@ -3,6 +3,10 @@ spring:
     name: backend
   profiles:
     active: local
+  jpa:
+    # Off, so a request's EntityManager and its database connection end with the service call, not when the response is written.
+    # With it on, an upload would keep the connection it used to read the account while it waits for the parser.
+    open-in-view: false
   session:
     # Idle timeout (D-34, D-38).
     # The absolute lifetime below is a second, independent limit that this alone cannot give (SR-38).

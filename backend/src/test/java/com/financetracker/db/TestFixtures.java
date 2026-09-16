@@ -81,13 +81,15 @@ final class TestFixtures {
             Connection connection, long userId, long accountId, String status, LocalDate statementDate)
             throws SQLException {
         long n = SEQUENCE.incrementAndGet();
+        // V7 requires a hold reason on every HELD import and refuses one on any other status.
+        String holdReason = "HELD".equals(status) ? "BALANCE_CHAIN_BROKEN" : null;
         return insertReturningId(
                 connection,
                 """
-                INSERT INTO app.statement_imports (user_id, account_id, source_filename, file_sha256, status, statement_date)
-                VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+                INSERT INTO app.statement_imports (user_id, account_id, source_filename, file_sha256, status, statement_date, hold_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
                 """,
-                userId, accountId, "statement-" + n + ".csv", "sha256-" + n, status, statementDate);
+                userId, accountId, "statement-" + n + ".csv", "sha256-" + n, status, statementDate, holdReason);
     }
 
     static long insertImportRow(Connection connection, long userId, long statementImportId, int rowNumber)

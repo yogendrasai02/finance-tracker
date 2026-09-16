@@ -16,7 +16,7 @@ Make this update in the same commit or change set as the code change.
 | `.env.example` | Template for the gitignored `.env`, listing the owner credential and database variables. |
 | `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and the frontend lint, test, and build steps. |
 | `.github/dependabot.yml` | Weekly dependency updates for Maven, npm, and GitHub Actions; version-update PRs paused until production, security alerts (SR-19) unaffected. |
-| `.claude/launch.json` | Dev server registration so the Claude Code browser preview can attach to `npm run dev`. |
+| `.claude/launch.json` | Dev server registration so the Claude Code browser preview can start the frontend (`npm run dev`) and the backend (`./mvnw spring-boot:run`). |
 
 ## 2. Plans & Status (`plans/`)
 
@@ -68,6 +68,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/resources/db/migration/V4__seed_data.sql` | Starter user, default accounts, and standard category seeds. |
 | `backend/src/main/resources/db/migration/V5__auth.sql` | Credential columns on `app.users` and the `SECURITY DEFINER` login lookup function. |
 | `backend/src/main/resources/db/migration/V6__session_store.sql` | Spring Session JDBC's session tables, created in the `auth` schema instead of `app`. |
+| `backend/src/main/resources/db/migration/V7__statement_import_support.sql` | `accounts.statement_format` with its dedup-method pairing check, the seeded formats, and `statement_imports.hold_reason` / `hold_row_number` with their pairing checks (DM-42, DM-43). |
 
 ## 6. Backend Application (`backend/src/main/`)
 
@@ -82,6 +83,10 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/user/UserRepository.java` | Package-private Spring Data JPA repository for `User`. |
 | `backend/src/main/java/com/financetracker/account/Account.java` | JPA entity mapping `app.accounts`. |
 | `backend/src/main/java/com/financetracker/account/AccountRepository.java` | Package-private Spring Data JPA repository for `Account`. |
+| `backend/src/main/java/com/financetracker/account/StatementFormat.java` | The statement export an account is imported as (D-43); selects the parser. |
+| `backend/src/main/java/com/financetracker/statement/StatementImport.java` | JPA entity mapping `app.statement_imports`: one row per uploaded file, including the hold reason. |
+| `backend/src/main/java/com/financetracker/statement/StatementImportRow.java` | JPA entity mapping `app.statement_import_rows`, with `raw_cells` as JSON text in a `String`. |
+| `backend/src/main/java/com/financetracker/transaction/Transaction.java` | JPA entity mapping `app.transactions`; references to other features are plain `Long` columns. |
 | `backend/src/main/java/com/financetracker/account/AccountResponse.java` | FR-1's response DTO: id, name, type, active — no balance yet and no dedup method. |
 | `backend/src/main/java/com/financetracker/account/AccountService.java` | Lists the caller's accounts; logs how many were found. Tenant scoping and RLS do the filtering, not this class. |
 | `backend/src/main/java/com/financetracker/account/AccountController.java` | `GET /api/v1/accounts`, the first tenant-scoped, domain-data endpoint. |
@@ -129,6 +134,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/TestFixtures.java` | Reusable JDBC fixture generation helpers for tests. |
 | `backend/src/test/java/com/financetracker/db/MigrationApplyTest.java` | Verifies clean migration application. |
 | `backend/src/test/java/com/financetracker/db/AuthSchemaTest.java` | Proves the credential column rules hold and the login lookup is the only tenant-free read of a user. |
+| `backend/src/test/java/com/financetracker/db/StatementImportSupportSchemaTest.java` | Proves V7's rules: seeded statement formats, the format and dedup-method pairing, and a hold reason present exactly when an import is held. |
 | `backend/src/test/java/com/financetracker/db/SessionStoreSchemaTest.java` | Proves V6's session tables exist in `auth`, carry no Row-Level Security, and are reachable by `ft_app`. |
 | `backend/src/test/java/com/financetracker/db/SchemaConventionsTest.java` | Catalog sweep checking paise integers, UTC timestamps, and tenant keys. |
 | `backend/src/test/java/com/financetracker/db/RolePrivilegeTest.java` | Verifies `ft_app` cannot run DDL or alter triggers and policies. |
@@ -140,7 +146,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/db/CrossTenantConstraintTest.java` | Proves foreign keys reject cross-tenant references. |
 | `backend/src/test/java/com/financetracker/db/SupportingTableConstraintTest.java` | Tests constraints on categories, rules, checkpoints, and imports. |
 | `backend/src/test/java/com/financetracker/db/DeleteRuleTest.java` | Proves `RESTRICT`, `CASCADE`, and `SET NULL` behaviors. |
-| `backend/src/test/java/com/financetracker/account/JpaBaselineTest.java` | DataJpaTest proving entity mappings validate and RLS is active through Hibernate. |
+| `backend/src/test/java/com/financetracker/account/JpaBaselineTest.java` | DataJpaTest proving entity mappings validate, RLS is active through Hibernate for accounts, imports, raw rows and transactions, and `raw_cells` reads back as written. |
 | `backend/src/test/java/com/financetracker/account/AccountsIntegrationTest.java` | Real HTTP: an authenticated caller gets their own accounts, an unauthenticated one gets 401, and two tenants never see each other's rows. |
 | `backend/src/test/java/com/financetracker/common/tenant/CurrentTenantContextTest.java` | Proves the tenant scope restores and clears, including when the work throws. |
 | `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |

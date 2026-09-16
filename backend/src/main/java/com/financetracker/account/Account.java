@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -26,6 +28,9 @@ import lombok.ToString;
  *
  * {@code type} and {@code dedup_method} are stored as plain strings with CHECK constraints in the database (DM-04).
  * No JPA enum mapping to avoid migration friction.
+ *
+ * {@code statement_format} is the exception and maps to {@link StatementFormat}: each value selects a parser class, so a new value needs code as well as a migration anyway.
+ * {@code NULL} means the account is never imported.
  *
  * {@code created_at} and {@code updated_at} are set by database triggers, so they are mapped as non-insertable and non-updatable.
  */
@@ -60,6 +65,10 @@ public class Account {
 
     @Column(name = "dedup_method", nullable = false)
     private String dedupMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "statement_format")
+    private StatementFormat statementFormat;
 
     @Column(name = "is_active", nullable = false)
     private boolean active;
