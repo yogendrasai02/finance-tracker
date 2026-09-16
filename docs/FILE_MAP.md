@@ -26,6 +26,7 @@ Make this update in the same commit or change set as the code change.
 | `plans/STEP2_PLAN.md` | Implementation plan for Step 2 (Flyway migrations and PostgreSQL roles). |
 | `plans/STEP3_PLAN.md` | Implementation plan for Step 3 (Schema Testcontainers test suite). |
 | `plans/STEP4_PLAN.md` | Implementation plan for Step 4 (authentication, session, and the tenant execution path). |
+| `plans/STEP5_PLAN.md` | Implementation plan for Step 5 (statement import: secure intake, the three parsers, dedup and batch checks, API, frontend). |
 
 ## 3. Documentation (`docs/`)
 

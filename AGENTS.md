@@ -426,3 +426,30 @@ Run commands from the repository root or the specified directory:
   `docker compose up -d`.
 - Reset local database with fresh roles and migrations:
   `docker compose down -v && docker compose up -d`.
+
+---
+
+# 15. Working Across Sessions on a Step Plan
+
+A step is built over several sessions, one sub-step per session.
+Each step plan (`plans/STEP<n>_PLAN.md`) carries its own progress table and build log in its Part 0 and Part 7.
+Those two sections are the source of truth for what is done, not memory and not `plans/STATUS.md`.
+
+Starting a session:
+
+- Read the plan's Part 0, its progress table, and only the sub-step being built. Do not read the other sub-steps.
+- Use the sub-step's "Read first" list instead of searching the repo. Explore further only when a compile or test failure sends you elsewhere.
+- Read the build log for the sub-steps already finished; it records where the code differs from the plan.
+- If the code and the plan disagree, the code wins. Record the difference; never change working code to match a stale plan.
+
+Finishing a sub-step, in the same change as the code:
+
+- Run that sub-step's verification commands, and report the real output.
+- Update the progress table row.
+- Add a build-log entry: what was built, what differed from the plan, what surprised you, what the next sub-step must know, and the test count.
+- Update [docs/FILE_MAP.md](docs/FILE_MAP.md) for every file created, moved, renamed or deleted.
+- Update the current-position block in [plans/STATUS.md](plans/STATUS.md) to name the next sub-step.
+
+A sub-step is not done until those updates exist.
+`plans/` is gitignored, so these files are not part of the commit; update them at the same time anyway.
+Keep entries short. A long build log stops being read, which defeats its purpose.
