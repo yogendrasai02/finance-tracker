@@ -44,7 +44,10 @@ public final class PostgresTestContainer {
                         MountableFile.forHostPath(script, 0755),
                         "/docker-entrypoint-initdb.d/01-roles-and-schema.sh")
                 .withEnv("FT_MIGRATOR_PASSWORD", MIGRATOR_PASSWORD)
-                .withEnv("FT_APP_PASSWORD", APP_PASSWORD);
+                .withEnv("FT_APP_PASSWORD", APP_PASSWORD)
+                // Spring caches every distinct test context, each with its own pool of 10, and they all share this one database.
+                // Postgres's default of 100 ran out once the suite had about ten contexts; fsync=off is Testcontainers' own default, kept.
+                .withCommand("postgres", "-c", "fsync=off", "-c", "max_connections=300");
 
         container.start();
         return container;

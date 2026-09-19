@@ -32,6 +32,8 @@
 		<archunit.version>1.5.0</archunit.version>
 		<bouncycastle.version>1.85.2</bouncycastle.version>
 		<bucket4j.version>8.19.0</bucket4j.version>
+		<!-- Overrides the Boot-managed 11.0.24, which has three advisories at CVSS 9.1 to 9.8 (SR-19). Remove once the Boot parent manages 11.0.25 or later. -->
+		<tomcat.version>11.0.26</tomcat.version>
 	</properties>
 	<dependencies>
 		<dependency>
