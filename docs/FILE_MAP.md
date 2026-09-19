@@ -57,6 +57,9 @@ Make this update in the same commit or change set as the code change.
 | `.agents/hooks/session_context.sh` | Hook gathering live git and project state on session start. |
 | `.claude/hooks` | Symlink pointing to `../.agents/hooks` for Claude Code cross-tool compatibility. |
 | `.claude/skills` | Symlink pointing to `../.agents/skills` for Claude Code cross-tool compatibility. |
+| `.agents/skills/safe-push/SKILL.md` | The safe-push workflow: scan tracked files and unpushed commits for secrets and financial PII, and push only if clean. |
+| `.agents/skills/safe-push/scripts/scan_secrets.py` | The scanner safe-push runs, with a narrow allowlist for known false positives in `is_allowlisted()`. |
+| `.agents/skills/safe-push/scripts/test_scan_secrets.py` | Self-test proving each allowlisted false positive passes and a real-looking value next to it still fails. |
 | `.claude/settings.json` | Claude Code settings configuring hooks. |
 
 ## 5. Database Initialization & Migrations

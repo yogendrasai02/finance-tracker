@@ -36,6 +36,42 @@ IGNORE_SUBSTRINGS = [
     "com.financetracker", "backend-local", "backend-prod", "000000000", "123456789"
 ]
 
+# Allowlist rules for known false positives.
+# Each rule is narrow on purpose: it skips one exact shape of match, never a whole file or directory.
+# test_scan_secrets.py proves each false positive passes and a real-looking value next to it still fails.
+
+GENERIC_SECRET_RULE = "Generic Secret/Password Assignment"
+AADHAAR_FORMATTED_RULE = "Indian Aadhaar Number (Formatted)"
+
+# Throwaway credentials used only by the backend tests and their Testcontainers database.
+# Matched exactly, so a different value in the same place is still reported.
+KNOWN_TEST_PLACEHOLDERS = {"not-a-real-password-1234", "ft_migrator_test", "ft_app_test"}
+
+# "$FT_APP_PASSWORD" or "${FT_APP_PASSWORD}": a shell reference to an environment variable, not a value.
+ENV_VAR_REFERENCE = re.compile(r"\$\{?[A-Z_][A-Z0-9_]*\}?")
+
+# PASSWORD :'app_password' is psql's syntax for a variable set with --set, not a value.
+PSQL_VARIABLE_REFERENCE = re.compile(r"\s:'[A-Za-z_][A-Za-z0-9_]*'$")
+
+UUID_PATTERN = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+
+
+def is_allowlisted(rule, match, line):
+    if rule == GENERIC_SECRET_RULE:
+        value = match.group(1)
+        if value in KNOWN_TEST_PLACEHOLDERS:
+            return True
+        if ENV_VAR_REFERENCE.fullmatch(value):
+            return True
+        if PSQL_VARIABLE_REFERENCE.search(match.group(0)):
+            return True
+    if rule == AADHAAR_FORMATTED_RULE:
+        # A UUID's last groups can look like a formatted Aadhaar number; skip a match only when it sits inside a UUID.
+        for uuid in UUID_PATTERN.finditer(line):
+            if uuid.start() <= match.start() and match.end() <= uuid.end():
+                return True
+    return False
+
 def luhn_check(num_str):
     digits = [int(c) for c in num_str if c.isdigit()]
     if len(digits) < 13 or len(digits) > 19:
@@ -68,6 +104,8 @@ def scan_text(text, source_name):
                 val = match.group(0)
                 val_lower = val.lower()
                 if any(sub in val_lower for sub in IGNORE_SUBSTRINGS):
+                    continue
+                if is_allowlisted(name, match, line):
                     continue
                 # Special validation for Indian PAN: 4th char must indicate entity type
                 if name == "Indian PAN Number":

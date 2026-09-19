@@ -38,6 +38,17 @@ The script inspects:
 - **Developer secrets**: AWS keys, GitHub tokens, Google API keys, OpenAI/Anthropic keys, Stripe keys, private keys, database connection strings, bearer tokens, and generic password assignments.
 - **Financial & Banking PII**: Unmasked Indian bank account numbers, PAN card numbers, formatted/contextual Aadhaar numbers, payment card numbers (validated via Luhn algorithm), card CVV/PINs, and phone-number-based UPI VPAs.
 
+The scanner has a small allowlist for known false positives, in `is_allowlisted()`.
+It skips exact shapes of match, never whole files or directories:
+- a password assignment whose value is an uppercase shell variable reference (`"$FT_APP_PASSWORD"`) or a psql variable (`PASSWORD :'app_password'`)
+- the three exact throwaway test passwords in `KNOWN_TEST_PLACEHOLDERS`
+- an Aadhaar-shaped match that sits inside a UUID
+
+When changing the allowlist, add a case to `scripts/test_scan_secrets.py` and run it:
+```bash
+python3 .agents/skills/safe-push/scripts/test_scan_secrets.py
+```
+
 ### 3. Handle Scan Results
 
 #### If Secrets or PII Are Detected (Exit Code 1)
