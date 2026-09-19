@@ -1,4 +1,10 @@
 statements
+*.xlsx
+*.xlsm
+*.xlsb
+*.xls
+*.csv
+*.pdf
 .DS_Store
 .env
 plans

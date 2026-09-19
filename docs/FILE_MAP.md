@@ -14,7 +14,7 @@ Make this update in the same commit or change set as the code change.
 | `README.md` | Quickstart guide and Docker / test commands. |
 | `docker-compose.yml` | Local PostgreSQL 18 service with healthcheck and volume configuration. |
 | `.env.example` | Template for the gitignored `.env`, listing the owner credential and database variables. |
-| `.github/workflows/ci.yml` | CI pipeline running Gitleaks, backend tests, and the frontend lint, test, and build steps. |
+| `.github/workflows/ci.yml` | CI pipeline running Gitleaks, the statement-file guard, the OSV-Scanner dependency scan, backend tests, and the frontend lint, test, and build steps; every action pinned to a commit SHA. |
 | `.github/dependabot.yml` | Weekly dependency updates for Maven, npm, and GitHub Actions; version-update PRs paused until production, security alerts (SR-19) unaffected. |
 | `.claude/launch.json` | Dev server registration so the Claude Code browser preview can start the frontend (`npm run dev`) and the backend (`./mvnw spring-boot:run`). |
 
@@ -48,7 +48,9 @@ Make this update in the same commit or change set as the code change.
 | Path | Purpose |
 | :--- | :--- |
 | `scripts/setup-hooks.sh` | Shell script to configure local git hooks. |
-| `scripts/hooks/pre-commit` | Pre-commit hook running Gitleaks against staged changes. |
+| `scripts/hooks/pre-commit` | Pre-commit hook running Gitleaks and the statement-file guard against staged changes. |
+| `scripts/check-no-statement-files.sh` | Fails if a spreadsheet, CSV, PDF, or `statements/` path is tracked, or staged with `--staged` (SR-47). |
+| `scripts/check-critical-cves.sh` | Reads an OSV-Scanner JSON report, lists the scanned packages and findings, and fails at CVSS 9.0 or higher (SR-19). |
 | `.agents/hooks.json` | Antigravity lifecycle hooks configuration (commit message and comment style validation). |
 | `.agents/hooks/check_commit_message.py` | WORA hook verifying git commit messages follow AGENTS.md §9 conventions. |
 | `.agents/hooks/check_comment_style.py` | WORA hook verifying code comments follow AGENTS.md §6 and §7 conventions. |
@@ -122,7 +124,7 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/main/java/com/financetracker/common/tenant/TenantAwareJpaTransactionManager.java` | Applies `app.user_id` to every transaction and refuses one that has no tenant. |
 | `backend/src/main/java/com/financetracker/common/tenant/MissingTenantContextException.java` | Thrown when a transaction would run with no tenant and is not a system transaction. |
 | `backend/src/main/java/com/financetracker/common/tenant/TenantConfiguration.java` | Registers the tenant-aware transaction manager in place of the auto-configured one. |
-| `backend/src/main/java/com/financetracker/common/config/ProductionEnvironmentGuard.java` | Refuses to start the `prod` profile if `DB_URL` lacks `sslmode=verify-full` or the owner credential is unset, before any bean — including the datasource — is created. |
+| `backend/src/main/java/com/financetracker/common/config/ProductionEnvironmentGuard.java` | Refuses to start the `prod` profile if `DB_URL` lacks `sslmode=verify-full`, the owner credential is unset, `logServerErrorDetail` is not false, or a pinned logger runs at DEBUG or TRACE, before any bean — including the datasource — is created. |
 
 ## 7. Backend Tests (`backend/src/test/`)
 
@@ -151,7 +153,8 @@ Make this update in the same commit or change set as the code change.
 | `backend/src/test/java/com/financetracker/common/tenant/CurrentTenantContextTest.java` | Proves the tenant scope restores and clears, including when the work throws. |
 | `backend/src/test/java/com/financetracker/common/tenant/TenantTransactionTest.java` | Proves the tenant reaches the connection Hibernate uses and that each tenant sees only its own rows. |
 | `backend/src/test/java/com/financetracker/architecture/ArchitectureTest.java` | ArchUnit rules protecting the tenant mechanism and the layering conventions. |
-| `backend/src/test/java/com/financetracker/common/config/ProductionEnvironmentGuardTest.java` | Drives every branch of the guard against a plain `MockEnvironment`, plus two `ApplicationContextRunner` cases proving it is actually wired into Spring's own `refresh()`. |
+| `backend/src/test/java/com/financetracker/common/config/ProductionEnvironmentGuardTest.java` | Drives every branch of the guard against a plain `MockEnvironment`, checks the shipped YAML passes it, plus two `ApplicationContextRunner` cases proving it is actually wired into Spring's own `refresh()`. |
+| `backend/src/test/java/com/financetracker/common/config/ServerErrorDetailRedactionTest.java` | Proves the application's datasource keeps Postgres `DETAIL` out of a unique violation's message, with a control case showing pgjdbc's default leaks it (SR-28). |
 | `backend/src/test/java/com/financetracker/auth/OwnerCredentialBootstrapTest.java` | Proves the credential is hashed, set once, and kept out of the logs. |
 | `backend/src/test/java/com/financetracker/auth/AuthenticationIntegrationTest.java` | Drives login, `/me` and logout over real HTTP, checking cookie attributes, CSRF, and uniform failures. |
 | `backend/src/test/java/com/financetracker/common/security/SessionStoreTest.java` | Proves the session lives in `auth.spring_session`: a row appears on login, disappears on logout, and disappears when the absolute lifetime is exceeded. |

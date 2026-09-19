@@ -3,6 +3,14 @@ spring:
     name: backend
   profiles:
     active: local
+  datasource:
+    hikari:
+      data-source-properties:
+        # pgjdbc defaults this to true, which puts the server's DETAIL into every exception message.
+        # A unique violation's DETAIL prints the conflicting values, such as a narration or an amount (SECURITY.md SR-28).
+        # Set here, in the base file, so every profile is safe unless a developer turns it on locally and knowingly (D-30).
+        # ProductionEnvironmentGuard refuses to start prod unless it is false.
+        logServerErrorDetail: false
   jpa:
     # Off, so a request's EntityManager and its database connection end with the service call, not when the response is written.
     # With it on, an upload would keep the connection it used to read the account while it waits for the parser.
@@ -31,6 +39,14 @@ server:
         http-only: true
         secure: true
         same-site: strict
+
+logging:
+  level:
+    # Pinned so a broader DEBUG setting, such as on org.springframework.security, cannot reach these two loggers (SECURITY.md SR-25).
+    # AbstractUserDetailsAuthenticationProvider logs the submitted email at DEBUG for an unknown account.
+    org.springframework.security.authentication: INFO
+    # At TRACE this logs every bound parameter value, which for the importer means narrations and amounts.
+    org.hibernate.orm.jdbc.bind: INFO
 
 ft:
   session:

@@ -9,3 +9,5 @@ if ! command -v gitleaks >/dev/null 2>&1; then
 fi
 
 gitleaks protect --staged --redact -v
+
+"$(git rev-parse --show-toplevel)/scripts/check-no-statement-files.sh" --staged
